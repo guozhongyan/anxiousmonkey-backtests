@@ -1,1 +1,1 @@
-{"as_of":"2025-08-09T15:58:55+00:00","model":"NAMM-50","version":"v0.1-hotfix","weights":{"NAAM":1.0,"FRED":0.0,"NDX50":0.0,"CHINA":0.0},"latest":{"note":"Hotfix writes model JSON to docs/models/namm50.json"}}
+{"as_of":"2025-08-09T22:19:53+00:00","model":"NAMM-50","version":"v0.1-hotfix","weights":{"NAAM":1.0,"FRED":0.0,"NDX50":0.0,"CHINA":0.0},"latest":{"note":"Hotfix writes model JSON to docs/models/namm50.json"}}
