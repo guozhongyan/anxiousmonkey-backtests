@@ -1,0 +1,38 @@
+
+name: publish-factors
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 22 * * 1-5'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy requests
+      - name: Fetch data
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          NDX_TOPN: '5'
+        run: |
+          python fetchers/naaim.py
+          python fetchers/ndx_breadth_topn.py
+          python fetchers/china_proxy_fxi.py
+          python fetchers/fred_bundle.py
+      - name: Compose outputs
+        run: |
+          python compose_outputs.py
+      - name: Commit docs
+        run: |
+          git config user.name github-actions
+          git config user.email actions@github.com
+          git add docs/*.json data/raw/*.csv || true
+          git commit -m "Publish factors [skip ci]" || echo "No changes"
+          git push

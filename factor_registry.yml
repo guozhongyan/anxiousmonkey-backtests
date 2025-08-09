@@ -1,0 +1,22 @@
+
+factors:
+  - id: naaim_exposure
+    name: NAAIM Exposure Index
+    source: NAAIM (official)
+    frequency: weekly
+    fetcher: fetchers/naaim.py
+  - id: ndx_breadth_topn
+    name: NDX >50DMA (Top-N)
+    source: AlphaVantage (daily adj close)
+    frequency: daily
+    fetcher: fetchers/ndx_breadth_topn.py
+  - id: china_proxy_fxi
+    name: China Proxy (FXI)
+    source: AlphaVantage (TIME_SERIES_DAILY_ADJUSTED)
+    frequency: daily
+    fetcher: fetchers/china_proxy_fxi.py
+  - id: fred_macro_bundle
+    name: FRED Macro Bundle
+    source: FRED
+    frequency: daily/weekly/monthly
+    fetcher: fetchers/fred_bundle.py
