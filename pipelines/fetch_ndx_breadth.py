@@ -1,4 +1,6 @@
-import os, json, time
+import os
+import json
+import time
 import pandas as pd
 import numpy as np
 import requests
@@ -32,7 +34,7 @@ def compute_breadth(tickers):
     for t in tickers:
         try:
             df = yf.download(t, period="2y", interval="1d", auto_adjust=True, progress=False, threads=False)
-            if df is None or df.empty: 
+            if df is None or df.empty:
                 continue
             hist[t] = df["Close"].rename(t)
         except Exception:
@@ -53,3 +55,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
