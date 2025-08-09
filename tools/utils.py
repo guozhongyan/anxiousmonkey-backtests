@@ -1,0 +1,45 @@
+import os, json, math, time, io, re, datetime as dt
+from typing import Dict, List, Tuple
+import pandas as pd
+import numpy as np
+
+def ts_now_iso():
+    return pd.Timestamp.utcnow().isoformat(timespec="seconds")+"Z"
+
+def to_json_ready(df: pd.DataFrame, cols=None):
+    if cols is None:
+        cols = list(df.columns)
+    out = []
+    for idx, row in df[cols].iterrows():
+        if isinstance(idx, (pd.Timestamp, np.datetime64)):
+            ts = pd.Timestamp(idx).strftime("%Y-%m-%d")
+        else:
+            ts = str(idx)
+        item = [ts]
+        for c in cols:
+            v = row[c]
+            if isinstance(v, (np.floating, float)):
+                if pd.isna(v) or np.isnan(v):
+                    v = None
+            if isinstance(v, (np.integer, int)):
+                v = int(v)
+            item.append(v)
+        out.append(item)
+    return out
+
+def zscore(s: pd.Series):
+    s = s.astype(float)
+    m, sd = s.mean(), s.std(ddof=0)
+    if sd == 0 or pd.isna(sd):
+        return pd.Series(np.zeros(len(s),dtype=float), index=s.index)
+    return (s - m) / sd
+
+def label_from_score(x: float, thr_on=0.5, thr_off=-0.5):
+    if pd.isna(x):
+        return "Neutral"
+    if x >= thr_on: return "Risk-On"
+    if x <= thr_off: return "Risk-Off"
+    return "Neutral"
+
+def ensure_dir(path: str):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
