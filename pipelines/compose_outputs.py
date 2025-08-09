@@ -1,77 +1,114 @@
-\
-    import os, json
-    import pandas as pd
-    from tools.utils import ts_now_iso, label_from_score, to_json_ready, ensure_dir
+import sys, os, json
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-    FACTORS_CSV = "data/raw/namm50_components.csv"
-    SCORE_CSV = "data/raw/namm50_score.csv"
-    NAAIM_CSV = "data/raw/naaim_exposure.csv"
-    NDX_BREADTH_CSV = "data/raw/ndx_breadth_50dma.csv"
-    CHINA50_CSV = "data/raw/china50.csv"
+import pandas as pd
+import numpy as np
+from tools.utils import ensure_dir, to_json_ready, zscore, ts_now_iso
 
-    OUT_FACTORS_JSON = "docs/factors_namm50.json"
-    OUT_BACKTESTS_JSON = "docs/backtests.json"
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+RAW = os.path.join(ROOT, 'data', 'raw')
+OUT_JSON = os.path.join(ROOT, 'docs', 'factors_namm50.json')
 
-    def load_csv(path, date_col=None):
-        if not os.path.exists(path):
-            return None
-        if date_col is None:
-            return pd.read_csv(path, parse_dates=[0])
-        return pd.read_csv(path, parse_dates=[date_col])
+def _read_first_series(csv_path, prefer_cols=None):
+    if prefer_cols is None: prefer_cols = []
+    if not os.path.exists(csv_path): 
+        return pd.Series(dtype=float)
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return pd.Series(dtype=float)
+    if df.empty or df.shape[1] <= 1:
+        return pd.Series(dtype=float)
+    # normalize date
+    # find date-like column (first column) if it's name like 'Date' or unnamed
+    date_col = df.columns[0]
+    try:
+        df[date_col] = pd.to_datetime(df[date_col])
+        df = df.set_index(date_col)
+    except Exception:
+        # try default index
+        pass
+    # choose first numeric column
+    cols = list(df.columns)
+    for c in prefer_cols:
+        if c in cols:
+            s = pd.to_numeric(df[c], errors='coerce').dropna()
+            s.name = c
+            return s
+    # any numeric
+    for c in cols:
+        s = pd.to_numeric(df[c], errors='coerce')
+        if s.notna().any():
+            s = s.dropna()
+            s.name = c
+            return s
+    return pd.Series(dtype=float)
 
-    def main():
-        as_of = ts_now_iso()
-        F = load_csv(FACTORS_CSV); S = load_csv(SCORE_CSV)
-        if F is None or S is None:
-            raise RuntimeError("Missing NAMM-50 inputs")
-        F = F.set_index(F.columns[0]); S = S.set_index(S.columns[0])
-        naaim = load_csv(NAAIM_CSV)
-        ndx = load_csv(NDX_BREADTH_CSV)
-        cn = load_csv(CHINA50_CSV)
+def _read_frame(csv_path):
+    if not os.path.exists(csv_path): 
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return pd.DataFrame()
+    if df.empty: return pd.DataFrame()
+    date_col = df.columns[0]
+    try:
+        df[date_col] = pd.to_datetime(df[date_col])
+        df = df.set_index(date_col)
+    except Exception:
+        pass
+    # coerce numerics
+    for c in df.columns:
+        df[c] = pd.to_numeric(df[c], errors='coerce')
+    df = df.dropna(how='all')
+    return df
 
-        last_score = float(S.iloc[-1,0])
-        label = label_from_score(last_score)
+def build_payload():
+    payload = {"as_of": ts_now_iso(), "factors": {}}
 
-        data = {
-            "as_of": as_of,
-            "namm50": {
-                "last_score": last_score,
-                "label": label,
-                "score_series": to_json_ready(S, [S.columns[0]]),
-                "components_head": list(F.columns)
-            }
+    # NAAIM Exposure
+    naaim = _read_first_series(os.path.join(RAW, 'naaim_exposure.csv'), prefer_cols=['exposure','naaim','value'])
+    if not naaim.empty:
+        payload["factors"]["naaim_exposure"] = {
+            "latest": float(naaim.dropna().iloc[-1]),
+            "series": to_json_ready(naaim.to_frame(naaim.name), [naaim.name])
         }
-        if naaim is not None:
-            naaim = naaim.set_index(naaim.columns[0])
-            data["namm50"]["naaim_exposure"] = to_json_ready(naaim, [naaim.columns[0]])
-        if ndx is not None:
-            ndx = ndx.set_index(ndx.columns[0])
-            data["namm50"]["ndx_pct_above_50dma"] = to_json_ready(ndx, [ndx.columns[1] if len(ndx.columns)>1 else ndx.columns[0]])
-        if cn is not None:
-            cn = cn.set_index(cn.columns[0])
-            keep = [c for c in cn.columns][:2]
-            data["namm50"]["china50"] = to_json_ready(cn, keep)
 
-        ensure_dir(OUT_FACTORS_JSON)
-        with open(OUT_FACTORS_JSON, "w") as f:
-            json.dump(data, f, separators=(",", ":"))
+    # NDX breadth (pct above 50dma)
+    ndx = _read_first_series(os.path.join(RAW, 'ndx_breadth_50dma.csv'), prefer_cols=['pct_above_50dma'])
+    if not ndx.empty:
+        payload["factors"]["ndx_breadth_50dma"] = {
+            "latest": float(ndx.dropna().iloc[-1]),
+            "series": to_json_ready(ndx.to_frame(ndx.name), [ndx.name])
+        }
 
-        back = {"as_of": as_of, "symbols": {}}
-        if os.path.exists(OUT_BACKTESTS_JSON):
-            try:
-                with open(OUT_BACKTESTS_JSON,"r") as f:
-                    back0 = json.load(f)
-                if isinstance(back0, dict):
-                    back = back0
-            except Exception:
-                pass
-        back["as_of"] = as_of
-        back.setdefault("overlays", {})
-        back["overlays"]["namm50"] = {"label": label, "score": last_score}
-        ensure_dir(OUT_BACKTESTS_JSON)
-        with open(OUT_BACKTESTS_JSON, "w") as f:
-            json.dump(back, f, separators=(",", ":"))
-        print(f"Wrote {OUT_FACTORS_JSON} and updated {OUT_BACKTESTS_JSON}")
+    # China50 (FXI)
+    chn = _read_first_series(os.path.join(RAW, 'china50.csv'), prefer_cols=['FXI'])
+    if not chn.empty:
+        payload["factors"]["china50_fxi"] = {
+            "latest": float(chn.dropna().iloc[-1]),
+            "series": to_json_ready(chn.to_frame(chn.name), [chn.name])
+        }
 
-    if __name__ == "__main__":
-        main()
+    # FRED multi-series
+    fred = _read_frame(os.path.join(RAW, 'fred_namm50.csv'))
+    if not fred.empty:
+        cols = list(fred.columns)
+        payload["factors"]["fred_macro"] = {
+            "columns": cols,
+            "latest": {c: (None if pd.isna(fred[c].dropna().iloc[-1]) else float(fred[c].dropna().iloc[-1])) for c in cols if fred[c].notna().any()},
+            "series": to_json_ready(fred, cols)
+        }
+
+    return payload
+
+def main():
+    data = build_payload()
+    ensure_dir(OUT_JSON)
+    with open(OUT_JSON, "w") as f:
+        json.dump(data, f, separators=(",", ":"), ensure_ascii=False)
+    print(f"wrote {OUT_JSON}, keys={list(data['factors'].keys())}")
+
+if __name__ == "__main__":
+    main()
