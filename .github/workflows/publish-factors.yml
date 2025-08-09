@@ -1,0 +1,43 @@
+name: publish-factors
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "35 21 * * 1-5"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run factor pipelines
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
+        run: |
+          python pipelines/fetch_naaim.py
+          python pipelines/fetch_ndx_breadth.py
+          python pipelines/fetch_china50.py
+          python pipelines/fetch_fred_namm50.py
+          python pipelines/compose_outputs.py
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/factors_namm50.json docs/backtests.json data/raw/*.csv || true
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Update NAMM-50 factors & overlays [skip ci]"
+            git push
+          fi
