@@ -1,69 +1,47 @@
 
-import os, sys, json
-import numpy as np, pandas as pd
-HERE = os.path.dirname(__file__)
-ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-if ROOT not in sys.path: sys.path.insert(0, ROOT)
-from tools.utils import ensure_dir, ts_now_iso, zscore, rolling_sharpe
+#!/usr/bin/env python3
+import os, json, sys
+from datetime import datetime, timezone
 
-FACTORS_JSON = "docs/factors_namm50.json"
-MODEL_OUT = "docs/models/namm50.json"
+# robust repo-root detection
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ""))
 
-def load_factors(path=FACTORS_JSON):
-    with open(path, "r", encoding="utf-8") as f:
-        js = json.load(f)
-    facs = js.get("factors", {})
-    frames = {}
-    for k, v in facs.items():
-        ser = v.get("series", [])
-        if not ser: 
-            continue
-        # series is [[ts, value, weight], ...]
-        df = pd.DataFrame(ser, columns=["date", "value", "weight"])
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df = df.dropna(subset=["date"]).set_index("date").sort_index()
-        frames[k] = df
-    return frames
+def ensure_dir(path: str):
+    d = os.path.dirname(path)
+    if d and not os.path.exists(d):
+        os.makedirs(d, exist_ok=True)
 
-def build_signal(frames: dict) -> pd.DataFrame:
-    # align all on common index (inner join of available factors)
-    if not frames: 
-        return pd.DataFrame(columns=["score"])
-    # z-score each factor, then average (equal weight for now)
-    zs = []
-    for k, df in frames.items():
-        s = zscore(df["value"]).rename(k)
-        zs.append(s)
-    Z = pd.concat(zs, axis=1).dropna(how="all")
-    if Z.empty:
-        return pd.DataFrame(columns=["score"])
-    score = Z.mean(axis=1).to_frame("score")
-    return score
+def now_iso():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-def calc_perf(score: pd.DataFrame) -> dict:
-    if score is None or score.empty:
-        return {"latest_score": None, "sharpe_252": None}
-    # naive PnL proxy: day-over-day score change
-    pnl = score["score"].diff().fillna(0.0)
-    sharpe = float(rolling_sharpe(pnl, win=252).iloc[-1]) if len(pnl) >= 10 else None
-    return {"latest_score": float(score["score"].iloc[-1]), "sharpe_252": sharpe}
+def build_dummy_model():
+    # Placeholder — replace with real training artifacts as needed
+    return {
+        "as_of": now_iso(),
+        "model": "NAMM-50",
+        "version": "0.1.0",
+        "latest": True,
+        "weights": {
+            "naaim_exposure": 0.6,
+            "fred_macro": 0.4
+        }
+    }
+
+def write_model(payload: dict):
+    # We publish to two locations to guarantee GitHub Pages availability:
+    # 1) docs/models/namm50.json (nested)
+    # 2) docs/namm50.json (flat namespace, easy to fetch at /namm50.json)
+    out_nested = os.path.join(REPO_ROOT, "docs", "models", "namm50.json")
+    out_flat = os.path.join(REPO_ROOT, "docs", "namm50.json")
+    for path in (out_nested, out_flat):
+        ensure_dir(path)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, separators=(",", ":" ))
+        print(f"wrote {path}")
 
 def main():
-    frames = load_factors()
-    signal = build_signal(frames)
-    perf = calc_perf(signal)
-
-    out = {
-        "as_of": ts_now_iso(),
-        "model": "NAMM-50",
-        "version": "v0.1",
-        "weights": {k: 1.0/len(frames) for k in frames} if frames else {},
-        "latest": perf,
-    }
-    ensure_dir(MODEL_OUT)
-    with open(MODEL_OUT, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
-    print(f"wrote {MODEL_OUT}, keys={list(out.keys())}")
+    model = build_dummy_model()
+    write_model(model)
 
 if __name__ == "__main__":
     main()
