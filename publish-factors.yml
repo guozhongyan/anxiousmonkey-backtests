@@ -1,18 +1,10 @@
 name: publish-factors
-
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'fetchers/**'
-      - 'pipelines/**'
-      - 'tools/**'
-      - '.github/workflows/publish-factors.yml'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,51 +17,17 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || true
+          pip install pandas numpy requests beautifulsoup4 yfinance html5lib lxml
 
-      - name: Ensure packages
+      - name: Compose outputs (4 factors)
         run: |
-          mkdir -p fetchers pipelines tools models namm50 signals docs data/raw
-          touch fetchers/__init__.py pipelines/__init__.py tools/__init__.py models/__init__.py namm50/__init__.py signals/__init__.py
+          python pipelines/compose_outputs.py
 
-      - name: Fetch data
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
-          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
-          PYTHONPATH: ${{ github.workspace }}
+      - name: Ensure factors JSON published
         run: |
-          python - <<'PY'
-          import os, runpy, sys
-          os.environ.setdefault("PYTHONPATH", os.getcwd())
-          modules = [
-              "fetchers.naaim",
-              "pipelines.fetch_ndx_breadth",
-              "pipelines.fetch_china50",
-              "pipelines.fetch_fred_namm50",
-              "pipelines.compose_outputs",
-          ]
-          for mod in modules:
-              try:
-                  print(f"[run] {mod}")
-                  runpy.run_module(mod, run_name="__main__")
-              except SystemExit:
-                  pass
-              except Exception as e:
-                  if mod in ("pipelines.fetch_ndx_breadth", "pipelines.fetch_china50"):
-                      print(f"[warn] {mod} failed softly: {e}")
-                  else:
-                      raise
-          PY
-
-      - name: Commit docs
-        run: |
+          test -f docs/factors_namm50.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/*.json data/raw || true
-          if git diff --cached --quiet; then
-            echo "no changes"
-          else
-            git commit -m "Update NAMM-50 factors & overlays [skip ci]" || true
-            git push
-          fi
+          git add docs/factors_namm50.json || true
+          git commit -m "Publish NAMM-50 factors [skip ci]" || echo "no changes"
+          git push || true

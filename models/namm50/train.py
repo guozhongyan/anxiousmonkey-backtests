@@ -1,47 +1,41 @@
-
-#!/usr/bin/env python3
-import os, json, sys
+import os, json, time
+from pathlib import Path
 from datetime import datetime, timezone
 
-# robust repo-root detection
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ""))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DOCS_DIR = REPO_ROOT / "docs"
+(DOCS_DIR / "models").mkdir(parents=True, exist_ok=True)
 
-def ensure_dir(path: str):
-    d = os.path.dirname(path)
-    if d and not os.path.exists(d):
-        os.makedirs(d, exist_ok=True)
+MODEL_JSON = DOCS_DIR / "models" / "namm50.json"
 
-def now_iso():
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+def utc_iso():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
-def build_dummy_model():
-    # Placeholder — replace with real training artifacts as needed
+def load_weights():
+    # Minimal safe defaults; real training code can overwrite this function later.
+    # Keep the shape/keys stable so frontends don't break.
     return {
-        "as_of": now_iso(),
-        "model": "NAMM-50",
-        "version": "0.1.0",
-        "latest": True,
-        "weights": {
-            "naaim_exposure": 0.6,
-            "fred_macro": 0.4
-        }
+        "NAAM": 1.0,
+        "FRED": 0.0,
+        "NDX50": 0.0,
+        "CHINA": 0.0
     }
 
-def write_model(payload: dict):
-    # We publish to two locations to guarantee GitHub Pages availability:
-    # 1) docs/models/namm50.json (nested)
-    # 2) docs/namm50.json (flat namespace, easy to fetch at /namm50.json)
-    out_nested = os.path.join(REPO_ROOT, "docs", "models", "namm50.json")
-    out_flat = os.path.join(REPO_ROOT, "docs", "namm50.json")
-    for path in (out_nested, out_flat):
-        ensure_dir(path)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, separators=(",", ":" ))
-        print(f"wrote {path}")
-
 def main():
-    model = build_dummy_model()
-    write_model(model)
+    payload = {
+        "as_of": utc_iso(),
+        "model": "NAMM-50",
+        "version": "v0.1-hotfix",
+        "weights": load_weights(),
+        "latest": {
+            "note": "Hotfix writes model JSON to docs/models/namm50.json"
+        }
+    }
+    tmp = MODEL_JSON.with_suffix(".json.tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, separators=(",", ":" ))
+    tmp.replace(MODEL_JSON)
+    print(f"wrote {MODEL_JSON}")
 
 if __name__ == "__main__":
     main()

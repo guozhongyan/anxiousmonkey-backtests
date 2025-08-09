@@ -1,12 +1,10 @@
 name: train-models
-
 on:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,31 +17,24 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || true
-
-      - name: Ensure packages
-        run: |
-          mkdir -p models namm50 tools docs
-          touch models/__init__.py namm50/__init__.py tools/__init__.py
+          pip install pandas numpy requests beautifulsoup4 yfinance peewee html5lib lxml
 
       - name: Train NAMM-50
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: |
-          python - <<'PY'
-          import os, runpy
-          os.environ.setdefault("PYTHONPATH", os.getcwd())
-          runpy.run_module("models.namm50.train", run_name="__main__")
-          PY
+          python models/namm50/train.py
+
+      - name: Ensure model JSON published
+        run: |
+          mkdir -p docs/models
+          if [ -f models/docs/namm50.json ]; then cp -f models/docs/namm50.json docs/models/namm50.json; fi
+          if [ -f models/docs/models/namm50.json ]; then cp -f models/docs/models/namm50.json docs/models/namm50.json; fi
+          if [ -f models/namm50.json ]; then cp -f models/namm50.json docs/models/namm50.json; fi
+          test -f docs/models/namm50.json && echo "model json ready"
 
       - name: Commit model/backtests
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/*.json || true
-          if git diff --cached --quiet; then
-            echo "no changes"
-          else
-            git commit -m "Update NAMM-50 model outputs [skip ci]" || true
-            git push
-          fi
+          git add docs/models/namm50.json || true
+          git commit -m "Publish NAMM-50 model [skip ci]" || echo "no changes"
+          git push || true
