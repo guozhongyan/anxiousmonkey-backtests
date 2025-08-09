@@ -2,20 +2,22 @@ name: publish-factors
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'fetchers/**'
-      - 'pipelines/**'
-      - 'tools/**'
-      - '.github/workflows/publish-factors.yml'
+  schedule:
+    - cron: '15 10 * * 2-6'   # Tue-Sat 10:15 UTC ~= 03:15 PT (after US close)
+
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -25,51 +27,52 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || true
+          pip install -r requirements.txt
 
-      - name: Ensure packages
+      - name: Ensure packages & dirs
         run: |
-          mkdir -p fetchers pipelines tools models namm50 signals docs data/raw
-          touch fetchers/__init__.py pipelines/__init__.py tools/__init__.py models/__init__.py namm50/__init__.py signals/__init__.py
+          mkdir -p fetchers pipelines tools models namn50 signals docs data/raw
 
       - name: Fetch data
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
-          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
-          PYTHONPATH: ${{ github.workspace }}
         run: |
           python - <<'PY'
-          import os, runpy, sys
-          os.environ.setdefault("PYTHONPATH", os.getcwd())
-          modules = [
-              "fetchers.naaim",
-              "pipelines.fetch_ndx_breadth",
-              "pipelines.fetch_china50",
-              "pipelines.fetch_fred_namm50",
-              "pipelines.compose_outputs",
-          ]
-          for mod in modules:
-              try:
-                  print(f"[run] {mod}")
-                  runpy.run_module(mod, run_name="__main__")
-              except SystemExit:
-                  pass
-              except Exception as e:
-                  if mod in ("pipelines.fetch_ndx_breadth", "pipelines.fetch_china50"):
-                      print(f"[warn] {mod} failed softly: {e}")
-                  else:
-                      raise
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+          print("[run] fetchers.naaim"); import fetchers.naaim as NAAIM; NAAIM.main()
+          print("[run] pipelines.fetch_ndx_breadth"); import pipelines.fetch_ndx_breadth as B; 
+          try: B.main()
+          except Exception as e: print("Breadth empty; keep previous file.", e)
+          print("[run] pipelines.fetch_china50"); import pipelines.fetch_china50 as C; 
+          try: C.main()
+          except Exception as e: print("china50 empty; wrote placeholder.", e)
+          print("[run] pipelines.fetch_fred_namm50"); import pipelines.fetch_fred_namm50 as F; F.main()
+          PY
+
+      - name: Compose outputs
+        run: |
+          python - <<'PY'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+          print("[run] pipelines.compose_outputs"); import pipelines.compose_outputs as CO; CO.main()
           PY
 
       - name: Commit docs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/*.json data/raw || true
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/*.json data/raw/*.csv 2>/dev/null || true
           if git diff --cached --quiet; then
-            echo "no changes"
-          else
-            git commit -m "Update NAMM-50 factors & overlays [skip ci]" || true
-            git push
+            echo "No changes to commit."
+            exit 0
           fi
+          git commit -m "Update NAMM-50 factors & overlays [skip ci]"
+          # Ensure remote uses token
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin "${GITHUB_REF}"

@@ -3,13 +3,18 @@ name: train-models
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -19,31 +24,32 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || true
-
-      - name: Ensure packages
-        run: |
-          mkdir -p models namm50 tools docs
-          touch models/__init__.py namm50/__init__.py tools/__init__.py
+          pip install -r requirements.txt
 
       - name: Train NAMM-50
         env:
-          PYTHONPATH: ${{ github.workspace }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
         run: |
           python - <<'PY'
-          import os, runpy
-          os.environ.setdefault("PYTHONPATH", os.getcwd())
-          runpy.run_module("models.namm50.train", run_name="__main__")
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+          print("[run] models.namm50.train"); import models.namm50.train as T; T.main()
           PY
 
       - name: Commit model/backtests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/*.json || true
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/*.json data/raw/*.csv 2>/dev/null || true
+          git add models/**.json models/**.csv 2>/dev/null || true
           if git diff --cached --quiet; then
-            echo "no changes"
-          else
-            git commit -m "Update NAMM-50 model outputs [skip ci]" || true
-            git push
+            echo "No changes to commit."
+            exit 0
           fi
+          git commit -m "Train NAMM-50 & publish artifacts [skip ci]"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin "${GITHUB_REF}"
