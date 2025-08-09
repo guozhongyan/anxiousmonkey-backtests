@@ -1,10 +1,6 @@
 name: train-models
-
 on:
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   build:
@@ -12,9 +8,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -24,32 +17,24 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install pandas numpy requests beautifulsoup4 yfinance peewee html5lib lxml
 
       - name: Train NAMM-50
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
         run: |
-          python - <<'PY'
-          import os, sys
-          from pathlib import Path
-          sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-          print("[run] models.namm50.train"); import models.namm50.train as T; T.main()
-          PY
+          python models/namm50/train.py
+
+      - name: Ensure model JSON published
+        run: |
+          mkdir -p docs/models
+          if [ -f models/docs/namm50.json ]; then cp -f models/docs/namm50.json docs/models/namm50.json; fi
+          if [ -f models/docs/models/namm50.json ]; then cp -f models/docs/models/namm50.json docs/models/namm50.json; fi
+          if [ -f models/namm50.json ]; then cp -f models/namm50.json docs/models/namm50.json; fi
+          test -f docs/models/namm50.json && echo "model json ready"
 
       - name: Commit model/backtests
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/*.json data/raw/*.csv 2>/dev/null || true
-          git add models/**.json models/**.csv 2>/dev/null || true
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
-          git commit -m "Train NAMM-50 & publish artifacts [skip ci]"
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin "${GITHUB_REF}"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/models/namm50.json || true
+          git commit -m "Publish NAMM-50 model [skip ci]" || echo "no changes"
+          git push || true
