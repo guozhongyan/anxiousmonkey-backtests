@@ -1,38 +1,75 @@
-
 name: publish-factors
+
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '15 22 * * 1-5'
+  push:
+    paths:
+      - 'fetchers/**'
+      - 'pipelines/**'
+      - 'tools/**'
+      - '.github/workflows/publish-factors.yml'
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy requests
+          pip install -r requirements.txt || true
+
+      - name: Ensure packages
+        run: |
+          mkdir -p fetchers pipelines tools models namm50 signals docs data/raw
+          touch fetchers/__init__.py pipelines/__init__.py tools/__init__.py models/__init__.py namm50/__init__.py signals/__init__.py
+
       - name: Fetch data
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
           ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
-          NDX_TOPN: '5'
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          python fetchers/naaim.py
-          python fetchers/ndx_breadth_topn.py
-          python fetchers/china_proxy_fxi.py
-          python fetchers/fred_bundle.py
-      - name: Compose outputs
-        run: |
-          python compose_outputs.py
+          python - <<'PY'
+          import os, runpy, sys
+          os.environ.setdefault("PYTHONPATH", os.getcwd())
+          modules = [
+              "fetchers.naaim",
+              "pipelines.fetch_ndx_breadth",
+              "pipelines.fetch_china50",
+              "pipelines.fetch_fred_namm50",
+              "pipelines.compose_outputs",
+          ]
+          for mod in modules:
+              try:
+                  print(f"[run] {mod}")
+                  runpy.run_module(mod, run_name="__main__")
+              except SystemExit:
+                  pass
+              except Exception as e:
+                  if mod in ("pipelines.fetch_ndx_breadth", "pipelines.fetch_china50"):
+                      print(f"[warn] {mod} failed softly: {e}")
+                  else:
+                      raise
+          PY
+
       - name: Commit docs
         run: |
-          git config user.name github-actions
-          git config user.email actions@github.com
-          git add docs/*.json data/raw/*.csv || true
-          git commit -m "Publish factors [skip ci]" || echo "No changes"
-          git push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/*.json data/raw || true
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "Update NAMM-50 factors & overlays [skip ci]" || true
+            git push
+          fi
