@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Anxious Monkey – Live Alpha App (revamped)</title>
+  <link rel="stylesheet" href="./styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js" defer></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <header class="glass topbar">
+      <div class="brand">Anxious Monkey<span class="muted"> – Live</span></div>
+      <div class="spacer"></div>
+      <div class="meta">
+        <span id="asOf" class="pill">—</span>
+        <span id="version" class="pill">—</span>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="glass kpis">
+        <div class="kpi"><div class="k">NAAIM</div><div class="v" id="k-naaim">—</div></div>
+        <div class="kpi"><div class="k">>50DMA (NDX)</div><div class="v" id="k-ndx50">—</div></div>
+        <div class="kpi"><div class="k">China Proxy (FXI)</div><div class="v" id="k-china">—</div></div>
+        <div class="kpi"><div class="k">FRED Macro</div><div class="v" id="k-fred">—</div></div>
+      </section>
+
+      <section class="glass weights">
+        <h3>Factor Weights</h3>
+        <div id="weights" class="badges"></div>
+      </section>
+
+      <section class="glass playbook">
+        <h3>Playbook</h3>
+        <div id="playbookText" class="play"></div>
+      </section>
+
+      <section class="glass chart">
+        <h3>NAAIM Exposure</h3>
+        <canvas id="chart-naaim"></canvas>
+      </section>
+
+      <section class="glass chart">
+        <h3>>50DMA Breadth (NDX)</h3>
+        <canvas id="chart-ndx50"></canvas>
+      </section>
+
+      <section class="glass chart">
+        <h3>China Proxy (FXI)</h3>
+        <canvas id="chart-china"></canvas>
+      </section>
+
+      <section class="glass chart">
+        <h3>FRED Macro (DGS10, DFF)</h3>
+        <canvas id="chart-fred"></canvas>
+      </section>
+
+      <section class="glass prices">
+        <h3>Spot</h3>
+        <div class="tickers" id="prices">Loading…</div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
