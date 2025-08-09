@@ -1,1 +1,14 @@
-{ "as_of": "", "symbols": {} }
+{
+  "models": {
+    "namm50": {
+      "version": "v1.44",
+      "equity_curve": [],
+      "rolling_sharpe_63d": [],
+      "metrics": {
+        "ann_return": null,
+        "ann_vol": null,
+        "max_dd": null
+      }
+    }
+  }
+}
