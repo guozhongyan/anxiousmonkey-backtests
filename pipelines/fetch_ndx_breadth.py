@@ -6,7 +6,7 @@ import numpy as np
 import requests
 import yfinance as yf
 from bs4 import BeautifulSoup
-from tools.utils import ensure_dir
+from .tools.utils import ensure_dir
 
 OUT_CSV = "data/raw/ndx_breadth_50dma.csv"
 WIKI_URL = "https://en.wikipedia.org/wiki/Nasdaq-100"
