@@ -2,56 +2,48 @@ name: publish-factors
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
     paths:
-      - "fetchers/**"
-      - "models/**"
-      - "pipelines/**"
-      - "tools/**"
-      - ".github/workflows/publish-factors.yml"
-      - "requirements.txt"
+      - 'fetchers/**'
+      - 'pipelines/**'
+      - 'tools/**'
+      - '.github/workflows/publish-factors.yml'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
-      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-      NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
-      ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      - name: Fetch data
+      - name: Ensure package init files
         run: |
-          set -e
-          if [ -f fetchers/naaim.py ]; then python fetchers/naaim.py; fi
-          if [ -f fetchers/ndx_breadth.py ]; then python fetchers/ndx_breadth.py; fi
-          if [ -f fetchers/china50.py ]; then python fetchers/china50.py; fi
-          if [ -f fetchers/fred_namm50.py ]; then python fetchers/fred_namm50.py; fi
-      - name: Train NAMM-50
+          mkdir -p fetchers pipelines tools models namm50 signals
+          touch fetchers/__init__.py pipelines/__init__.py tools/__init__.py models/__init__.py namm50/__init__.py signals/__init__.py
+      - name: Run factor pipelines (package mode)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
         run: |
-          set -e
-          if [ -f models/namm50/train.py ]; then python models/namm50/train.py; fi
-      - name: Compose outputs
-        run: |
-          set -e
-          if [ -f pipelines/compose_outputs.py ]; then python pipelines/compose_outputs.py; fi
+          python -m fetchers.naaim
+          python -m pipelines.fetch_ndx_breadth || true
+          python -m pipelines.fetch_china50 || true
+          python -m pipelines.fetch_fred_namm50
+          python -m pipelines.compose_outputs
       - name: Commit & push
         run: |
-          set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/*.json || true
+          git add -A
           if git diff --cached --quiet; then
-            echo "No JSON changes"
+            echo "No changes to commit."
           else
-            git commit -m "Update factors/backtests (auto)"
+            git commit -m "publish-factors: package mode hotfix [skip ci]"
             git push
           fi
