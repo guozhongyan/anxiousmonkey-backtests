@@ -1,85 +1,100 @@
-import os, json
-from pathlib import Path
-import pandas as pd
-from datetime import datetime, timezone
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-RAW = REPO_ROOT / "data" / "raw"
-DOCS = REPO_ROOT / "docs"
-DOCS.mkdir(parents=True, exist_ok=True)
+import os, sys, json, pandas as pd, numpy as np, time, requests
 
-FACTORS_JSON = DOCS / "factors_namm50.json"
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from tools.utils import ensure_dir, ts_now_iso
 
-def utc_iso():
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+OUT_FACTORS = "docs/factors_namm50.json"
 
-def read_csv_series(path: Path, value_col=None):
-    if not path.exists():
+def read_csv_try(path, cols=None):
+    if not os.path.exists(path):
         return None
     try:
         df = pd.read_csv(path)
-        if value_col and value_col in df.columns:
-            s = df[value_col]
-            # optional date column normalization
-            dt_col = None
-            for c in df.columns:
-                if "date" in c.lower():
-                    dt_col = c; break
-            if dt_col:
-                idx = pd.to_datetime(df[dt_col]).dt.strftime("%Y-%m-%d").tolist()
-            else:
-                idx = list(range(len(s)))
-            return [[str(idx[i]), None, float(s.iloc[i])] for i in range(len(s)) if pd.notna(s.iloc[i])]
-        else:
-            # assume last column is the numeric metric
-            last = df.columns[-1]
-            s = df[last]
-            idx = list(range(len(s)))
-            return [[str(idx[i]), None, float(s.iloc[i])] for i in range(len(s)) if pd.notna(s.iloc[i])]
-    except Exception as e:
-        print(f"read_csv_series({path}): {e}")
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.sort_values("date").set_index("date")
+        return df
+    except Exception:
         return None
 
-def main():
-    out = {"as_of": utc_iso(), "factors": {}}
+def to_series(df, cols):
+    if df is None or df.empty:
+        return None
+    df = df.dropna()
+    if df.empty:
+        return None
+    out = []
+    for idx, row in df.iterrows():
+        item = [idx.strftime("%Y-%m-%d")]
+        for c in cols:
+            v = row.get(c, np.nan)
+            if pd.isna(v):
+                v = None
+            else:
+                v = float(v)
+            item.append(v)
+        out.append(item)
+    return out if out else None
 
-    # 1) NAAIM
-    out["factors"]["naaim_exposure"] = {
-        "series": read_csv_series(RAW / "naaim_exposure.csv")
-    }
-
-    # 2) FRED Macro (two columns expected DGS10, DFF) -> store last row as pair, also whole series of DGS10
-    fred_path = RAW / "fred_namm50.csv"
-    if fred_path.exists():
+def try_fetch_cnn_fgi():
+    urls = [
+        "https://production-files-cnnmoney-fear-and-greed-index.s3.amazonaws.com/production/fear-and-greed-index.json",
+        "https://production-files-cnnmoney-fear-and-greed-index.s3.amazonaws.com/production/fng/streams/index.json",
+        "https://production-files-cnnmoney-fear-and-greed-index.s3.amazonaws.com/production/fear-and-greed-index.json?noCache=1"
+    ]
+    for u in urls:
         try:
-            df = pd.read_csv(fred_path)
-            # Store DGS10 as series for chart
-            if "DGS10" in df.columns:
-                out["factors"].setdefault("fred_macro", {})["series"] = [[str(i), None, float(v)] for i, v in enumerate(df["DGS10"]) if pd.notna(v)]
-        except Exception as e:
-            print("fred read error", e)
+            r = requests.get(u, timeout=20, headers={"User-Agent":"Mozilla/5.0"})
+            if r.status_code != 200: continue
+            j = r.json()
+            vals = []
+            def dig(x):
+                if isinstance(x, dict):
+                    for v in x.values(): yield from dig(v)
+                elif isinstance(x, list):
+                    for v in x: yield from dig(v)
+                else:
+                    yield x
+            for v in dig(j):
+                try:
+                    f = float(v)
+                    if 0 <= f <= 100: vals.append(f)
+                except Exception:
+                    pass
+            if vals:
+                today = pd.Timestamp.utcnow().strftime("%Y-%m-%d")
+                return [[today, float(vals[-1])]]
+        except Exception:
+            continue
+    return None
 
-    # 3) NDX breadth (>50DMA)
-    out["factors"]["ndx_breadth"] = {
-        "series": read_csv_series(RAW / "ndx_breadth_topn.csv")
+def main():
+    naaim = read_csv_try("data/raw/naaim_exposure.csv")
+    ndx = read_csv_try("data/raw/ndx_breadth_50dma.csv")
+    china = None
+    for p in ["data/raw/china_proxy.csv","data/raw/china50_proxy.csv","data/raw/fxi_proxy.csv"]:
+        if os.path.exists(p):
+            china = read_csv_try(p)
+            if china is not None: break
+    fred = read_csv_try("data/raw/fred_macro.csv")
+    vix = read_csv_try("data/raw/vix_fred.csv")
+
+    out = {
+        "as_of": ts_now_iso(),
+        "factors": {
+            "naaim_exposure": {"series": to_series(naaim, [naaim.columns[0]]) if naaim is not None else None},
+            "fred_macro": {"series": to_series(fred, [c for c in ["DGS10","DFF"] if fred is not None and c in fred.columns]) if fred is not None else None},
+            "ndx_breadth": {"series": to_series(ndx, [ndx.columns[0]]) if ndx is not None else None},
+            "china_proxy": {"series": to_series(china, [china.columns[0]]) if china is not None else None},
+            "vix": {"series": to_series(vix, ["VIX"]) if vix is not None else None},
+            "cnn_fgi": {"series": try_fetch_cnn_fgi()}
+        }
     }
-
-    # 4) China proxy (FXI or alike)
-    out["factors"]["china_proxy"] = {
-        "series": read_csv_series(RAW / "china_proxy_fxi.csv")
-    }
-
-    # keep existing file if new series all None
-    if all(v.get("series") is None for v in out["factors"].values()):
-        if FACTORS_JSON.exists():
-            print("No new series. Keeping previous file.")
-            return
-
-    tmp = FACTORS_JSON.with_suffix(".json.tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
-    tmp.replace(FACTORS_JSON)
-    print(f"wrote {FACTORS_JSON}")
+    ensure_dir(OUT_FACTORS)
+    with open(OUT_FACTORS,"w") as f:
+        json.dump(out, f)
+    print("wrote", OUT_FACTORS)
 
 if __name__ == "__main__":
     main()
