@@ -1,50 +1,50 @@
+import os, sys, pandas as pd, requests
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from tools.utils import safe_write_csv, write_placeholder_csv
 
-import os, sys, requests as rq, pandas as pd
-HERE = os.path.dirname(__file__)
-ROOT = os.path.abspath(os.path.join(HERE, ".."))
-if ROOT not in sys.path: sys.path.insert(0, ROOT)
-from tools.utils import ensure_dir
+OUT_CSV = "data/raw/fred_namm50.csv"
+API_KEY = os.environ.get("FRED_API_KEY","").strip()
 
-OUT = "data/raw/fred_namm50.csv"
-SERIES = ["DGS10", "DFF"]  # 10Y yield, Fed funds
-
-def fetch_series(series_id: str, api_key: str) -> pd.Series:
-    url = "https://api.stlouisfed.org/fred/series/observations"
-    params = {"series_id": series_id, "api_key": api_key, "file_type": "json", "frequency": "d"}
-    r = rq.get(url, params=params, timeout=30)
+def fred_api(series_id: str):
+    url = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_id}&api_key={API_KEY}&file_type=json"
+    r = requests.get(url, timeout=30)
     r.raise_for_status()
     js = r.json()
-    obs = js.get("observations", [])
-    df = pd.DataFrame(obs)
-    if df.empty: 
-        return pd.Series(dtype=float)
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["value"] = pd.to_numeric(df["value"], errors="coerce")
-    df = df.set_index("date").sort_index()
-    return df["value"].rename(series_id)
+    arr = js.get("observations",[])
+    df = pd.DataFrame([{"date":a["date"], "value": float(a["value"]) if a["value"] not in (".","") else None} for a in arr])
+    df = df.dropna()
+    return df
+
+def fred_csv(series_id: str):
+    # 公共 CSV 兜底（无 KEY）
+    url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+    r = requests.get(url, timeout=30)
+    r.raise_for_status()
+    import io
+    df = pd.read_csv(io.StringIO(r.text))
+    # 标准化
+    df = df.rename(columns={series_id:"value"})
+    df = df[["DATE","value"]].rename(columns={"DATE":"date"}).dropna()
+    return df
 
 def main():
-    api_key = os.environ.get("FRED_API_KEY", "")
-    frames = []
-    for sid in SERIES:
-        try:
-            s = fetch_series(sid, api_key)
-            if not s.empty: frames.append(s)
-        except Exception:
-            continue
-    if not frames:
-        # keep previous if exists
-        if os.path.exists(OUT):
-            print("fred empty; keep previous file.")
-            return
+    try:
+        if API_KEY:
+            dgs10 = fred_api("DGS10")
+            dff   = fred_api("DFF")
         else:
-            pd.DataFrame(columns=SERIES).to_csv(OUT)
-            print("fred empty; wrote placeholder.")
-            return
-    df = pd.concat(frames, axis=1).sort_index()
-    ensure_dir(OUT)
-    df.to_csv(OUT)
-    print(f"saved {OUT}, cols={list(df.columns)}")
+            dgs10 = fred_csv("DGS10")
+            dff   = fred_csv("DFF")
+        # 合并并对齐
+        m = pd.merge(dgs10, dff, on="date", how="inner", suffixes=("_DGS10","_DFF"))
+        safe_write_csv(m, OUT_CSV)
+        print(f"saved {OUT_CSV}, cols={['DGS10','DFF']}, rows={len(m)}")
+        return
+    except Exception as e:
+        print("[warn] fred bundle failed:", e)
+    # 最终兜底：占位（列名与历史保持）
+    write_placeholder_csv(OUT_CSV, ["date","DGS10","DFF"])
+    print(f"[placeholder] wrote empty {OUT_CSV}")
 
 if __name__ == "__main__":
     main()

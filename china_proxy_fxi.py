@@ -1,35 +1,28 @@
+import os, sys, pandas as pd
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from tools.utils import safe_write_csv, write_placeholder_csv, load_prev_csv
 
-import os, sys
-import pandas as pd
-import yfinance as yf
-HERE = os.path.dirname(__file__)
-ROOT = os.path.abspath(os.path.join(HERE, ".."))
-if ROOT not in sys.path: sys.path.insert(0, ROOT)
-from tools.utils import ensure_dir
-
-OUT = "data/raw/china_proxy_fxi.csv"
-
-def fetch():
-    try:
-        df = yf.download("FXI", period="5y", interval="1d", auto_adjust=True, progress=False, threads=False)
-        if df is None or df.empty:
-            return pd.DataFrame(columns=["close"])
-        return df[["Close"]].rename(columns={"Close":"close"})
-    except Exception:
-        return pd.DataFrame(columns=["close"])
+OUT_CSV = "data/raw/china_proxy_fxi.csv"
 
 def main():
-    df = fetch()
-    ensure_dir(OUT)
-    if df.empty:
-        if os.path.exists(OUT):
-            print("china50 empty; wrote placeholder.")
-        else:
-            pd.DataFrame({"close":[]}).to_csv(OUT, index=True)
-            print("china50 empty; wrote placeholder.")
-    else:
-        df.to_csv(OUT)
-        print(f"saved {OUT}, rows={len(df)}")
+    try:
+        import yfinance as yf
+        df = yf.download("FXI", period="2y", interval="1d", auto_adjust=True, progress=False, threads=False)
+        if df is not None and not df.empty:
+            out = df[["Close"]].rename(columns={"Close":"value"}).reset_index()
+            out.columns = ["date","value"]
+            safe_write_csv(out, OUT_CSV)
+            print(f"saved {OUT_CSV}, rows={len(out)}")
+            return
+    except Exception as e:
+        print("[warn] FXI fetch failed:", e)
+    prev = load_prev_csv(OUT_CSV)
+    if prev is not None and len(prev) > 0:
+        safe_write_csv(prev, OUT_CSV)
+        print(f"[fallback] kept previous {OUT_CSV}, rows={len(prev)}")
+        return
+    write_placeholder_csv(OUT_CSV, ["date","value"])
+    print(f"[placeholder] wrote empty {OUT_CSV}")
 
 if __name__ == "__main__":
     main()
