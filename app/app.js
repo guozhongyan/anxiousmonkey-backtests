@@ -1,20 +1,44 @@
 
-// --------- Config
-const BASE = location.origin + location.pathname.replace(/\/app\/?$/, '/');
-const FACTORS_URL = new URL('../factors_namm50.json', BASE).toString();
-const MODEL_URL   = new URL('../models/namm50.json', BASE).toString();
-const PRICES_URL  = new URL('../prices.json', BASE).toString();
+// ---- Base path auto-detect for GitHub Pages Project Sites ----
+// Works whether the page loads at /anxiousmonkey-backtests/ or /anxiousmonkey-backtests/app/
+function getRepoBase() {
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  // parts[0] = repo name when hosted at /<repo>/..., fall back to '/'
+  return parts.length ? `/${parts[0]}/` : '/';
+}
+const BASE = getRepoBase();
+const bust = () => `?v=${Date.now()}`; // cache-busting to avoid stale JSON
+
+const URLS = {
+  factors: `${BASE}factors_namm50.json${bust()}`,
+  model:   `${BASE}models/namm50.json${bust()}`,
+  prices:  `${BASE}prices.json${bust()}`
+};
+
+// Robust fetch with human-friendly error message
+async function fetchJSON(url) {
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`HTTP ${r.status} ${url}`);
+  return r.json();
+}
+
+// 建议：数据加载处加 try/catch，失败时提示
+async function loadAll() {
+  try {
+    const [factors, model, prices] = await Promise.all([
+      fetchJSON(URLS.factors),
+      fetchJSON(URLS.model),
+      fetchJSON(URLS.prices),
+    ]);
+    return { factors, model, prices };
+  } catch (e) {
+    alert(`加载数据失败：${e.message}`);
+    throw e;
+  }
+}
 
 const fmtPct = x => (x==null? "—" : (x*100).toFixed(2)+'%');
 const $ = sel => document.querySelector(sel);
-
-async function safeFetch(u) {
-  const url = new URL(u);
-  url.searchParams.set('v', Date.now().toString());
-  const r = await fetch(url, {cache:'no-store'});
-  if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
-  return r.json();
-}
 
 function lastVal(series){
   if(!series || !series.length) return null;
@@ -94,11 +118,11 @@ function renderPrices(prices){
 
 async function main(){
   try{
-    const [factors, model, prices] = await Promise.all([safeFetch(FACTORS_URL), safeFetch(MODEL_URL), safeFetch(PRICES_URL).catch(()=>null)]);
+    const {factors, model, prices} = await loadAll();
     $('#asOf').textContent = factors.as_of || '—';
     $('#version').textContent = model.version || '—';
     // weights
-    const wd = $('#weights'); wd.innerHTML=''; 
+    const wd = $('#weights'); wd.innerHTML='';
     const W = model.weights || {};
     Object.entries(W).forEach(([k,v])=> wd.appendChild(badge(k, v)));
 
@@ -123,7 +147,6 @@ async function main(){
 
   }catch(e){
     console.error(e);
-    alert('加载数据失败：' + e.message);
   }
 }
 document.addEventListener('DOMContentLoaded', main);
