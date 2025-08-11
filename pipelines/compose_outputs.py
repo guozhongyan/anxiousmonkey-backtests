@@ -1,61 +1,135 @@
-import os, sys, json, pandas as pd, numpy as np
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from tools.utils import ts_now_iso, to_json_ready, json_dump
+import os, json, pandas as pd, numpy as np
+from core.utils import ensure_dir, ts_now_iso
 
-NAAM_CSV = "data/raw/naaim_exposure.csv"
-NDX_CSV  = "data/raw/ndx_breadth.csv"
-CHINA_CSV= "data/raw/china_proxy_fxi.csv"
-FRED_CSV = "data/raw/fred_namm50.csv"
-OUT_JSON = "docs/factors_namm50.json"
+RAW = {
+    "naaim_exposure": "data/raw/naaim_exposure.csv",
+    "fred_bundle": "data/raw/fred_bundle.csv",
+    "ndx_breadth": "data/raw/ndx_breadth_50dma.csv",
+    "china_proxy": "data/raw/china_proxy_fxi.csv",
+    "prices": "docs/prices.json",
+}
+OUT = "docs/factors_namm50.json"
 
-def read_series_or_none(path, cols):
-    try:
-        df = pd.read_csv(path)
-        if df is None or df.empty:
-            return None
-        df["date"] = pd.to_datetime(df[cols[0]])
-        out = df.set_index("date")[[cols[1]]]
-        out.columns = ["value"]
-        out = out.dropna()
-        if out.empty:
-            return None
-        return [[d.strftime("%Y-%m-%d"), float(v), 0.0] for d, v in out["value"].items()]
-    except Exception as e:
-        print(f"[warn] read {path} failed:", e)
+
+def load_naaim(path):
+    if not os.path.exists(path):
         return None
+    df = pd.read_csv(path, parse_dates=["date"]).dropna(subset=["date"]).set_index("date").sort_index()
+    if "value" not in df.columns:
+        return None
+    return pd.DataFrame({"value": df["value"].astype(float)})
+
+
+def load_fred_macro(df):
+    if df is None or not {"DGS10", "DFF"}.issubset(df.columns):
+        return None
+    val = df["DGS10"].astype(float) - df["DFF"].astype(float)
+    return pd.DataFrame({"value": val})
+
+
+def load_ndx(path):
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path, parse_dates=["date"]).set_index("date").sort_index()
+    col = "pct_above" if "pct_above" in df.columns else df.columns[-1]
+    return pd.DataFrame({"value": df[col].astype(float)})
+
+
+def load_china(path):
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path, parse_dates=["date"]).set_index("date").sort_index()
+    if "close" not in df.columns:
+        return None
+    return pd.DataFrame({"value": df["close"].astype(float)})
+
+
+def load_fred_bundle(path):
+    if not os.path.exists(path):
+        return None
+    return pd.read_csv(path, parse_dates=["date"]).set_index("date").sort_index()
+
+
+def load_prices(path):
+    try:
+        js = json.load(open(path, "r", encoding="utf-8"))
+        series = js.get("series", {})
+        frames = {}
+        for t, arr in series.items():
+            idx = [pd.to_datetime(a[0]) for a in arr]
+            vals = [a[1] for a in arr]
+            frames[t] = pd.Series(vals, index=idx, dtype=float)
+        if frames:
+            return pd.DataFrame(frames).sort_index()
+    except Exception:
+        pass
+    return None
+
+
+def price_factor(s, transform):
+    if transform == "mom_12m_1m":
+        return s.pct_change(252) - s.pct_change(21)
+    if transform == "rsi_14":
+        delta = s.diff()
+        up = delta.clip(lower=0).rolling(14).mean()
+        down = (-delta.clip(upper=0)).rolling(14).mean()
+        rs = up / down
+        return 100 - (100 / (1 + rs))
+    if transform == "atrp_14":
+        tr = s.diff().abs()
+        atr = tr.rolling(14).mean()
+        return atr / s * 100.0
+    return None
+
+
+def df_to_series(df):
+    if df is None or df.empty:
+        return None
+    out = []
+    for idx, val in df["value"].items():
+        ts = idx.strftime("%Y-%m-%d")
+        v = None if pd.isna(val) else float(val)
+        out.append([ts, None, v])
+    return out
+
 
 def main():
-    factors = {}
+    reg = json.load(open("factor_registry.yml", "r", encoding="utf-8"))
+    fred_df = load_fred_bundle(RAW["fred_bundle"])
+    px = load_prices(RAW["prices"])
+    payload = {"as_of": ts_now_iso(), "factors": {}}
 
-    # NAAIM
-    s = read_series_or_none(NAAM_CSV, ["date","value"])
-    factors["naaim_exposure"] = {"series": s} if s else {"series": None}
+    payload["factors"]["naaim_exposure"] = {"series": df_to_series(load_naaim(RAW["naaim_exposure"]))}
+    payload["factors"]["fred_macro"] = {"series": df_to_series(load_fred_macro(fred_df))}
+    payload["factors"]["ndx_breadth"] = {"series": df_to_series(load_ndx(RAW["ndx_breadth"]))}
+    payload["factors"]["china_proxy"] = {"series": df_to_series(load_china(RAW["china_proxy"]))}
 
-    # NDX breadth
-    s = read_series_or_none(NDX_CSV, ["date","value"])
-    factors["ndx_breadth"] = {"series": s} if s else {"series": None}
+    extra = 0
+    for fid, spec in reg.get("factors", {}).items():
+        if fid in payload["factors"]:
+            continue
+        if spec.get("source") == "fred":
+            code = spec.get("code")
+            if fred_df is not None and code in fred_df.columns:
+                s = fred_df[code].astype(float)
+                payload["factors"][fid] = {"series": df_to_series(s.to_frame("value"))}
+            else:
+                payload["factors"][fid] = {"series": None}
+            extra += 1
+        elif spec.get("source") == "prices":
+            ticker = spec.get("ticker")
+            transform = spec.get("transform")
+            if px is not None and ticker in px.columns:
+                s = price_factor(px[ticker], transform)
+                payload["factors"][fid] = {"series": df_to_series(s.to_frame("value")) if s is not None else None}
+            else:
+                payload["factors"][fid] = {"series": None}
+            extra += 1
+    ensure_dir(OUT)
+    with open(OUT, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    print(f"wrote {OUT} with keys: {list(payload['factors'].keys())}; added {extra} extra factors")
 
-    # China proxy
-    s = read_series_or_none(CHINA_CSV, ["date","value"])
-    factors["china_proxy"] = {"series": s} if s else {"series": None}
-
-    # FRED macro: 这里简单计算 DGS10 与 DFF 的利差
-    fred = None
-    try:
-        df = pd.read_csv(FRED_CSV)
-        if not df.empty and "DGS10" in df.columns and "DFF" in df.columns:
-            df["date"] = pd.to_datetime(df["date"])
-            df = df.dropna()
-            df["spread"] = df["DGS10"] - df["DFF"]
-            out = df.set_index("date")[["spread"]]
-            fred = [[d.strftime("%Y-%m-%d"), float(v), 0.0] for d, v in out["spread"].items()]
-    except Exception as e:
-        print("[warn] fred compose failed:", e)
-    factors["fred_macro"] = {"series": fred} if fred else {"series": None}
-
-    payload = {"as_of": ts_now_iso(), "factors": factors}
-    json_dump(payload, OUT_JSON)
-    print(f"wrote {OUT_JSON} with keys: {list(factors.keys())}")
 
 if __name__ == "__main__":
     main()

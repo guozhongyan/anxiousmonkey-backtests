@@ -1,40 +1,30 @@
 name: train-models
 on:
   workflow_dispatch:
-
+  schedule:
+    - cron: "20 10 * * 2-6"
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy requests beautifulsoup4 yfinance peewee html5lib lxml
-
+          pip install pandas numpy requests
       - name: Train NAMM-50
         run: |
           python models/namm50/train.py
-
       - name: Ensure model JSON published
         run: |
           mkdir -p docs/models
-          if [ -f models/docs/namm50.json ]; then cp -f models/docs/namm50.json docs/models/namm50.json; fi
-          if [ -f models/docs/models/namm50.json ]; then cp -f models/docs/models/namm50.json docs/models/namm50.json; fi
-          if [ -f models/namm50.json ]; then cp -f models/namm50.json docs/models/namm50.json; fi
           test -f docs/models/namm50.json && echo "model json ready"
-
       - name: Commit model/backtests
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/models/namm50.json || true
+          git add docs/models/namm50.json
           git commit -m "Publish NAMM-50 model [skip ci]" || echo "no changes"
-          git push || true
+          git push

@@ -1,40 +1,32 @@
-import os, sys, pandas as pd
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from tools.utils import get_text_with_fallbacks, safe_read_csv_text, safe_write_csv, write_placeholder_csv, load_prev_csv
+import os, io, time, requests, pandas as pd
+from core.utils import ensure_dir
 
-OUT_CSV = "data/raw/naaim_exposure.csv"
-
-URLS = [
-    "https://naaim.org/wp-content/uploads/naaim_exposure_index.csv",
-    "https://www.naaim.org/wp-content/uploads/naaim_exposure_index.csv",
-]
+CSV_URL = "https://naaim.org/wp-content/uploads/naaim_exposure_index.csv"
+OUT = "data/raw/naaim_exposure.csv"
 
 def main():
-    txt = get_text_with_fallbacks(URLS, timeout=30)
-    if txt:
-        df = safe_read_csv_text(txt)
-        if df is not None:
-            # 标准化两列
-            cols = [c.lower() for c in df.columns]
-            if "date" not in cols or ("value" not in cols and "exposure" not in cols):
-                # 兼容官方 csv 的列名大小写
-                df.columns = [c.lower() for c in df.columns]
-            if "value" not in df.columns and "exposure" in df.columns:
-                df["value"] = df["exposure"]
-            if "date" in df.columns and "value" in df.columns:
-                df = df[["date", "value"]].dropna()
-                safe_write_csv(df, OUT_CSV)
-                print(f"saved {OUT_CSV}, rows={len(df)}")
-                return
-    # 兜底：沿用旧文件
-    prev = load_prev_csv(OUT_CSV)
-    if prev is not None and len(prev) > 0:
-        safe_write_csv(prev, OUT_CSV)
-        print(f"[fallback] kept previous file: {OUT_CSV}, rows={len(prev)}")
-        return
-    # 占位
-    write_placeholder_csv(OUT_CSV, ["date","value"])
-    print(f"[placeholder] wrote empty {OUT_CSV}")
-
+    ok = False
+    try:
+        r = requests.get(CSV_URL, timeout=30)
+        r.raise_for_status()
+        df = pd.read_csv(io.StringIO(r.text))
+        date_col = next((c for c in df.columns if 'date' in c.lower()), df.columns[0])
+        val_col  = next((c for c in df.columns if 'exposure' in c.lower() or 'value' in c.lower()), df.columns[-1])
+        df = df[[date_col, val_col]].rename(columns={date_col:"date", val_col:"value"})
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df = df.dropna(subset=["date"]).sort_values("date")
+        ensure_dir(OUT)
+        df.to_csv(OUT, index=False)
+        print(f"saved {OUT}, rows={len(df)}")
+        ok = True
+    except Exception as e:
+        print(f"NAAIM primary failed: {e}")
+    if not ok:
+        if os.path.exists(OUT):
+            print("placeholder: keep existing file")
+        else:
+            ensure_dir(OUT)
+            pd.DataFrame([{"date": pd.Timestamp.today().normalize(), "value": None}]).to_csv(OUT, index=False)
+            print("wrote placeholder NAAIM file")
 if __name__ == "__main__":
     main()
