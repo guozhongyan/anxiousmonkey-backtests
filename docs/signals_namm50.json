@@ -1,0 +1,29 @@
+{
+  "as_of": "2025-08-11T09:10:46+00:00Z",
+  "model": "NAMM-50",
+  "score": 0.0,
+  "stance": "Neutral",
+  "details": {
+    "factors_used": [],
+    "placeholders": [
+      "NAAM",
+      "FRED",
+      "NDX50",
+      "CHINA",
+      "VIXCLS",
+      "CURVE10Y2Y",
+      "CURVE10Y3M",
+      "DGS10",
+      "DFF",
+      "DFII10",
+      "UNRATE",
+      "CPIAUCSL",
+      "BAMLH0A0HYM2",
+      "MOMQQQ12M1M",
+      "RSIQQQ14",
+      "RSISPY14",
+      "ATRQQQ14"
+    ],
+    "window": 180
+  }
+}

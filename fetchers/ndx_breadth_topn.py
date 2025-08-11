@@ -1,70 +1,69 @@
-
-import os, sys, time, io, json, re
-import pandas as pd, numpy as np
+import time, pandas as pd, numpy as np
 import yfinance as yf
-import requests as rq
-HERE = os.path.dirname(__file__)
-ROOT = os.path.abspath(os.path.join(HERE, ".."))
-if ROOT not in sys.path: sys.path.insert(0, ROOT)
-from tools.utils import ensure_dir
+from core.utils import ensure_dir
 
-OUT = "data/raw/ndx_breadth_topn.csv"
-WIKI_URL = "https://en.wikipedia.org/wiki/Nasdaq-100"
+OUT = "data/raw/ndx_breadth_50dma.csv"
+WIKI = "https://en.wikipedia.org/wiki/Nasdaq-100"
 
-def get_constituents(limit: int = 20):
+
+def constituents():
     try:
-        r = rq.get(WIKI_URL, timeout=30)
-        r.raise_for_status()
-        tables = pd.read_html(r.text)
-        tickers = []
-        for df in tables:
-            cols = [str(c).lower() for c in df.columns]
-            if any("ticker" in c for c in cols) or any("symbol" in c for c in cols):
-                col = None
-                for c in df.columns:
-                    if "ticker" in str(c).lower() or "symbol" in str(c).lower():
-                        col = c; break
-                if col is None: continue
-                vals = list(pd.Series(df[col]).dropna().astype(str))
-                vals = [re.sub(r"[^A-Za-z0-9\.-]", "", v).upper().replace(".", "-") for v in vals if v.strip()]
-                tickers = list(dict.fromkeys(vals))
-                break
-        if not tickers:
-            tickers = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","COST","PEP","ADBE"]
-        return tickers[:limit]
-    except Exception:
-        return ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","COST","PEP","ADBE"][:limit]
+        tables = pd.read_html(WIKI)
+        for t in tables:
+            cols = [c.lower() for c in t.columns]
+            if any("ticker" in c or "symbol" in c for c in cols):
+                col = t.columns[["ticker" in c.lower() or "symbol" in c.lower() for c in cols].index(True)]
+                tickers = t[col].astype(str).str.replace(r"\..*", "", regex=True).tolist()
+                return tickers
+    except Exception as e:
+        print(f"wiki fetch failed: {e}")
+    return []
 
-def compute_breadth(tickers, lookback: int = 50):
-    hist = {}
-    for t in tickers:
+
+def download_batch(batch):
+    for attempt in range(3):
         try:
-            df = yf.download(t, period="2y", interval="1d", auto_adjust=True, progress=False, threads=False)
-            if df is not None and not df.empty:
-                hist[t] = df["Close"].rename(t)
-        except Exception:
+            df = yf.download(batch, period="2y", interval="1d", auto_adjust=True, progress=False, threads=False)
+            return df
+        except Exception as e:
+            print(f"batch {batch} failed: {e}")
+            time.sleep(1.2)
+    return pd.DataFrame()
+
+
+def compute():
+    tickers = constituents()
+    if not tickers:
+        return pd.DataFrame(columns=["date", "pct_above"])
+    closes = []
+    for i in range(0, len(tickers), 25):
+        batch = tickers[i : i + 25]
+        df = download_batch(batch)
+        if df is None or df.empty:
             continue
-    if not hist:
-        return pd.DataFrame(columns=["pct_above_50dma"])
-    prices = pd.DataFrame(hist).sort_index()
-    sma = prices.rolling(lookback).mean()
-    breadth = (prices >= sma).sum(axis=1) / prices.shape[1] * 100.0
-    return breadth.to_frame("pct_above_50dma")
+        if isinstance(df.columns, pd.MultiIndex):
+            df = df["Close"]
+        else:
+            df = df[["Close"]]
+            df.columns = [batch[0]]
+        closes.append(df)
+        time.sleep(1.2)
+    if not closes:
+        return pd.DataFrame(columns=["date", "pct_above"])
+    px = pd.concat(closes, axis=1).sort_index()
+    sma50 = px.rolling(50).mean()
+    pct = (px >= sma50).sum(axis=1) / px.shape[1] * 100.0
+    out = pct.to_frame("pct_above")
+    out.index.name = "date"
+    return out
+
 
 def main():
-    tickers = get_constituents(limit=20)
-    breadth = compute_breadth(tickers)
+    df = compute()
     ensure_dir(OUT)
-    if breadth.empty:
-        # keep old file if exists
-        if os.path.exists(OUT):
-            print("Breadth empty; keep previous file.")
-        else:
-            pd.DataFrame({"pct_above_50dma":[]}).to_csv(OUT, index=True)
-            print("Breadth empty; wrote placeholder.")
-    else:
-        breadth.to_csv(OUT, index=True)
-        print(f"saved {OUT}, rows={len(breadth)}")
+    df.to_csv(OUT, index=True, date_format="%Y-%m-%d")
+    print(f"saved {OUT}, rows={len(df)}")
+
 
 if __name__ == "__main__":
     main()

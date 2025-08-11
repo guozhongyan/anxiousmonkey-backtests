@@ -1,10 +1,26 @@
 name: publish-factors
+
 on:
   workflow_dispatch:
+  schedule:
+    # 每天 10:05 UTC 跑一次（你可按需改 cron）
+    - cron: '5 10 * * *'
+  push:
+    paths:
+      - 'fetchers/**'
+      - 'pipelines/**'
+      - 'tools/**'
+      - 'docs/**'
+      - '.github/workflows/publish-factors.yml'
+      - 'requirements.txt'
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,17 +33,65 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy requests beautifulsoup4 yfinance html5lib lxml
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          # 兜底安装，避免 requirements 缺项
+          pip install pandas numpy requests yfinance beautifulsoup4 lxml html5lib webencodings
 
-      - name: Compose outputs (4 factors)
+      - name: Ensure packages
         run: |
-          python pipelines/compose_outputs.py
+          mkdir -p fetchers pipelines tools models docs data/raw
+          # 让 Python 能以包形式导入项目内模块
+          echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
 
-      - name: Ensure factors JSON published
+      - name: Fetch data
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
+          NAAIM_MIRROR_URLS: ${{ vars.NAAIM_MIRROR_URLS }}
+        shell: bash
         run: |
-          test -f docs/factors_namm50.json
+          python - <<'PY'
+          import runpy, sys, os
+          sys.path.insert(0, os.getcwd())
+          def run(mod):
+              print(f"[run] {mod}")
+              runpy.run_module(mod, run_name="__main__")
+          # 逐步跑各数据源；单个失败不要终止
+          for m in (
+              "fetchers.naaim",
+              "pipelines.fetch_ndx_breadth",
+              "pipelines.fetch_china50",
+              "pipelines.fetch_fred_namm50",
+          ):
+              try:
+                  run(m)
+              except SystemExit as e:
+                  print(f"[warn] {m} exit: {e}")
+              except Exception as e:
+                  print(f"[warn] {m} failed: {e}")
+          PY
+
+      - name: Compose outputs
+        shell: bash
+        run: |
+          python - <<'PY'
+          import runpy, sys, os
+          sys.path.insert(0, os.getcwd())
+          print("[run] pipelines.compose_outputs")
+          runpy.run_module("pipelines.compose_outputs", run_name="__main__")
+          PY
+
+      - name: Commit docs
+        shell: bash
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/factors_namm50.json || true
-          git commit -m "Publish NAMM-50 factors [skip ci]" || echo "no changes"
-          git push || true
+          git add docs/factors_namm50.json data/raw/*.csv || true
+          if git diff --cached --quiet; then
+            echo "no changes to commit"
+          else
+            git commit -m "Update NAMM-50 factors & overlays [skip ci]"
+            git push
+          fi

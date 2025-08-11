@@ -1,28 +1,28 @@
-import os, sys, pandas as pd
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from tools.utils import safe_write_csv, write_placeholder_csv, load_prev_csv
+import pandas as pd, yfinance as yf
+from core.utils import ensure_dir
 
-OUT_CSV = "data/raw/china_proxy_fxi.csv"
+OUT = "data/raw/china_proxy_fxi.csv"
+
 
 def main():
     try:
-        import yfinance as yf
         df = yf.download("FXI", period="2y", interval="1d", auto_adjust=True, progress=False, threads=False)
-        if df is not None and not df.empty:
-            out = df[["Close"]].rename(columns={"Close":"value"}).reset_index()
-            out.columns = ["date","value"]
-            safe_write_csv(out, OUT_CSV)
-            print(f"saved {OUT_CSV}, rows={len(out)}")
-            return
     except Exception as e:
-        print("[warn] FXI fetch failed:", e)
-    prev = load_prev_csv(OUT_CSV)
-    if prev is not None and len(prev) > 0:
-        safe_write_csv(prev, OUT_CSV)
-        print(f"[fallback] kept previous {OUT_CSV}, rows={len(prev)}")
+        print(f"FXI download failed: {e}")
+        df = pd.DataFrame()
+    if df is None or df.empty:
+        print("FXI empty; writing placeholder")
+        ensure_dir(OUT)
+        pd.DataFrame({"date": [], "close": [], "z": []}).to_csv(OUT, index=False)
         return
-    write_placeholder_csv(OUT_CSV, ["date","value"])
-    print(f"[placeholder] wrote empty {OUT_CSV}")
+    df = df[["Close"]].rename(columns={"Close": "close"})
+    s = df["close"].pct_change().rolling(5).mean() * 100.0
+    z = (s - s.rolling(60).mean()) / s.rolling(60).std(ddof=0)
+    df["z"] = z
+    ensure_dir(OUT)
+    df.to_csv(OUT, index=True, date_format="%Y-%m-%d")
+    print(f"saved {OUT}, rows={len(df)}")
+
 
 if __name__ == "__main__":
     main()
