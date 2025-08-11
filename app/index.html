@@ -15,6 +15,7 @@
   <div class="wrap">
     <header class="glass topbar">
       <div class="brand">Anxious Monkey<span class="muted"> – Live</span></div>
+      <a href="#broker-tab" class="pill" id="nav-broker">Broker / Webull HK</a>
       <div class="spacer"></div>
       <div class="meta">
         <span id="asOf" class="pill">—</span>
@@ -65,6 +66,175 @@
         <div class="tickers" id="prices">Loading…</div>
       </section>
     </main>
+
+    <section id="broker-tab" class="glass" style="margin-top:24px;padding:14px">
+      <div class="broker-grid">
+        <div class="card">
+          <h3>Connect Webull HK</h3>
+          <label>App Key</label>
+          <input id="appKey" placeholder="输入 App Key">
+          <label>App Secret</label>
+          <input id="appSecret" placeholder="输入 App Secret">
+          <div class="row">
+            <div style="flex:1">
+              <label>Env</label>
+              <select id="env">
+                <option value="uat">UAT</option>
+                <option value="prod">PROD</option>
+              </select>
+            </div>
+            <div style="flex:1">
+              <label>Mock</label>
+              <select id="mock">
+                <option value="1">ON</option>
+                <option value="0">OFF</option>
+              </select>
+            </div>
+          </div>
+          <button id="btnConnect">Connect</button>
+          <p id="connStatus">未连接</p>
+          <p style="font-size:12px;color:#666">提示：密钥只通过 HTTPS POST 发往后端，不会存储在浏览器本地。生产环境请改为后端环境变量与只读服务账户。</p>
+        </div>
+
+        <div class="card">
+          <h3>Place Order from Signal</h3>
+          <div class="row">
+            <div style="flex:1">
+              <label>Symbol</label>
+              <input id="sym" value="SOXL">
+            </div>
+            <div style="flex:1">
+              <label>Side</label>
+              <select id="side">
+                <option>BUY</option><option>SELL</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div style="flex:1">
+              <label>Qty</label>
+              <input id="qty" type="number" value="100">
+            </div>
+            <div style="flex:1">
+              <label>Limit</label>
+              <input id="limit" type="number" step="0.01" value="12.10">
+            </div>
+          </div>
+          <button id="btnPlace">Place</button>
+          <pre id="placeOut" style="background:#f6f6f6;padding:8px;border-radius:8px;white-space:pre-wrap;"></pre>
+        </div>
+
+        <div class="card">
+          <h3>Model Signals</h3>
+          <button id="btnSignals">Refresh</button>
+          <table id="tblSignals"><thead><tr>
+            <th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Conf</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="card">
+          <h3>Positions</h3>
+          <button id="btnPos">Refresh</button>
+          <table id="tblPos"><thead><tr>
+            <th>Symbol</th><th>Qty</th><th>Avg</th><th>Mkt</th><th>PNL</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="card">
+          <h3>Orders</h3>
+          <button id="btnOrders">Refresh</button>
+          <table id="tblOrders"><thead><tr>
+            <th>OID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Limit</th><th>Status</th><th>TS</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="card">
+          <h3>Order Events</h3>
+          <pre id="evtLog" style="height:220px;overflow:auto;padding:8px;border-radius:8px;"></pre>
+        </div>
+      </div>
+    </section>
   </div>
+
+  <script>
+    let SID = null;
+
+    $('#btnConnect').onclick = async () => {
+      const payload = {
+        app_key: $('#appKey').value.trim(),
+        app_secret: $('#appSecret').value.trim(),
+        env: $('#env').value,
+        mock: $('#mock').value === '1'
+      };
+      const r = await fetch('/api/session/connect', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      if(!r.ok){ $('#connStatus').textContent = '连接失败'; return; }
+      const data = await r.json();
+      SID = data.session_id;
+      $('#connStatus').textContent = '已连接: ' + SID;
+
+      const evtSrc = new EventSource('/api/events/stream/'+SID);
+      evtSrc.onmessage = e => {
+        $('#evtLog').textContent += e.data + '\n';
+        $('#btnOrders').click();
+      };
+    };
+
+    $('#btnSignals').onclick = async () => {
+      const r = await fetch('/api/signals/current');
+      const d = await r.json();
+      const tbody = $('#tblSignals tbody');
+      tbody.innerHTML = '';
+      d.signals.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${s.symbol}</td><td>${s.side}</td><td>${s.qty}</td><td>${s.order_type}</td><td>${s.limit_price??''}</td><td>${(s.confidence*100).toFixed(0)}%</td>`;
+        tbody.appendChild(tr);
+      });
+    };
+
+    $('#btnPos').onclick = async () => {
+      if(!SID) return alert('先连接');
+      const r = await fetch('/api/positions/'+SID);
+      const d = await r.json();
+      const tbody = $('#tblPos tbody'); tbody.innerHTML = '';
+      d.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${p.symbol}</td><td>${p.qty}</td><td>${p.avg_price.toFixed(2)}</td><td>${p.mkt_price.toFixed(2)}</td><td>${p.pnl.toFixed(2)}</td>`;
+        tbody.appendChild(tr);
+      });
+    };
+
+    $('#btnOrders').onclick = async () => {
+      const r = await fetch('/api/orders');
+      const d = await r.json();
+      const tbody = $('#tblOrders tbody'); tbody.innerHTML = '';
+      d.forEach(o => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><code>${o.client_order_id}</code></td><td>${o.symbol}</td><td>${o.side}</td><td>${o.qty}</td><td>${o.limit_price??''}</td><td>${o.status}</td><td>${new Date(o.ts*1000).toLocaleString()}</td>`;
+        tbody.appendChild(tr);
+      });
+    };
+
+    $('#btnPlace').onclick = async () => {
+      if(!SID) return alert('先连接');
+      const signal = {
+        symbol: $('#sym').value.trim(),
+        market: 'US',
+        side: $('#side').value,
+        qty: Number($('#qty').value),
+        order_type: 'LIMIT',
+        limit_price: Number($('#limit').value),
+        tif: 'DAY',
+        confidence: 0.7,
+        meta: {}
+      };
+      const r = await fetch('/api/orders/place', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({session_id: SID, signal})});
+      const d = await r.json();
+      $('#placeOut').textContent = JSON.stringify(d, null, 2);
+      $('#btnOrders').click();
+    };
+
+    // bootstrap
+    $('#btnSignals').click();
+  </script>
 </body>
 </html>
