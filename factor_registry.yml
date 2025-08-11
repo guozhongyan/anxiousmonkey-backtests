@@ -1,22 +1,21 @@
-
-factors:
-  - id: naaim_exposure
-    name: NAAIM Exposure Index
-    source: NAAIM (official)
-    frequency: weekly
-    fetcher: fetchers/naaim.py
-  - id: ndx_breadth_topn
-    name: NDX >50DMA (Top-N)
-    source: AlphaVantage (daily adj close)
-    frequency: daily
-    fetcher: fetchers/ndx_breadth_topn.py
-  - id: china_proxy_fxi
-    name: China Proxy (FXI)
-    source: AlphaVantage (TIME_SERIES_DAILY_ADJUSTED)
-    frequency: daily
-    fetcher: fetchers/china_proxy_fxi.py
-  - id: fred_macro_bundle
-    name: FRED Macro Bundle
-    source: FRED
-    frequency: daily/weekly/monthly
-    fetcher: fetchers/fred_bundle.py
+{
+  "factors": {
+    "naaim_exposure": {"source": "naaim"},
+    "fred_macro": {"source": "fred_macro"},
+    "ndx_breadth": {"source": "ndx_breadth"},
+    "china_proxy": {"source": "yahoo"},
+    "vix_cls": {"source": "fred", "code": "VIXCLS"},
+    "curve_10y2y": {"source": "fred", "code": "T10Y2Y"},
+    "curve_10y3m": {"source": "fred", "code": "T10Y3M"},
+    "dgs10": {"source": "fred", "code": "DGS10"},
+    "dff": {"source": "fred", "code": "DFF"},
+    "dfii10": {"source": "fred", "code": "DFII10"},
+    "unrate": {"source": "fred", "code": "UNRATE"},
+    "cpiaucsl": {"source": "fred", "code": "CPIAUCSL"},
+    "baml_hy_oas": {"source": "fred", "code": "BAMLH0A0HYM2"},
+    "mom_qqq_12m1m": {"source": "prices", "ticker": "QQQ", "transform": "mom_12m_1m"},
+    "rsi_qqq_14": {"source": "prices", "ticker": "QQQ", "transform": "rsi_14"},
+    "rsi_spy_14": {"source": "prices", "ticker": "SPY", "transform": "rsi_14"},
+    "atr_qqq_14": {"source": "prices", "ticker": "QQQ", "transform": "atrp_14"}
+  }
+}
