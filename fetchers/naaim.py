@@ -7,7 +7,9 @@ import pandas as pd
 # 如果你 repo 里是 tools/utils.py，请把下一行改回: from tools.utils import ensure_dir
 from core.utils import ensure_dir
 
+# 输出 CSV 路径（保留旧变量名以兼容早期脚本 / 测试）
 OUT = "data/raw/naaim_exposure.csv"
+OUT_CSV = OUT
 
 # 官方与镜像/备用地址（按顺序尝试）
 DEFAULT_URLS = [
@@ -30,6 +32,25 @@ def fetch(url: str, timeout: int = 30) -> str | None:
             return r.text
     except Exception:
         pass
+    return None
+
+
+def get_text_with_fallbacks(urls, timeout=30):
+    """Try each URL until one returns text or all fail."""
+    for u in urls:
+        txt = fetch(u, timeout=timeout)
+        if txt:
+            return txt
+    return None
+
+
+def load_prev_csv(path: str) -> pd.DataFrame | None:
+    """Load previous CSV if present, else return None."""
+    if os.path.exists(path):
+        try:
+            return pd.read_csv(path)
+        except Exception:
+            return None
     return None
 
 
@@ -88,33 +109,25 @@ def parse_csv_text(text: str) -> pd.DataFrame | None:
 
 def write_placeholder_when_needed():
     """当抓取失败且不存在旧文件时，写一个空壳 CSV，避免后续流水线中断。"""
-    if not os.path.exists(OUT):
-        ensure_dir(OUT)
-        pd.DataFrame(columns=["date", "value"]).to_csv(OUT, index=False)
+    if not os.path.exists(OUT_CSV):
+        ensure_dir(OUT_CSV)
+        pd.DataFrame(columns=["date", "value"]).to_csv(OUT_CSV, index=False)
         print("naaim: wrote placeholder CSV (no data).")
 
 
 def main():
-    ensure_dir(OUT)
+    ensure_dir(OUT_CSV)
 
-    # 逐个 URL 尝试
-    df = None
-    for url in DEFAULT_URLS:
-        txt = fetch(url)
-        if not txt:
-            print(f"naaim: fetch failed: {url}")
-            continue
-        df = parse_csv_text(txt)
-        if df is not None:
-            break
+    txt = get_text_with_fallbacks(DEFAULT_URLS)
+    df = parse_csv_text(txt) if txt else None
 
     if df is not None and not df.empty:
-        df.to_csv(OUT, index=False)
-        print(f"saved {OUT}, rows={len(df)}")
+        df.to_csv(OUT_CSV, index=False)
+        print(f"saved {OUT_CSV}, rows={len(df)}")
         return
 
     # 到这一步说明都失败了：保留旧文件，否则写占位
-    if os.path.exists(OUT):
+    if load_prev_csv(OUT_CSV) is not None:
         print("naaim: all sources failed; keep previous file.")
     else:
         write_placeholder_when_needed()
