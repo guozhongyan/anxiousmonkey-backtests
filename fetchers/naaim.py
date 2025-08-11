@@ -14,11 +14,8 @@ def main():
     if txt:
         df = safe_read_csv_text(txt)
         if df is not None:
-            # 标准化两列
-            cols = [c.lower() for c in df.columns]
-            if "date" not in cols or ("value" not in cols and "exposure" not in cols):
-                # 兼容官方 csv 的列名大小写
-                df.columns = [c.lower() for c in df.columns]
+            # Always normalize column names to lowercase to handle case variations
+            df.columns = [c.lower() for c in df.columns]
             if "value" not in df.columns and "exposure" in df.columns:
                 df["value"] = df["exposure"]
             if "date" in df.columns and "value" in df.columns:
