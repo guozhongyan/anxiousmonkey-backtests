@@ -7,18 +7,31 @@ import pandas as pd
 import numpy as np
 DEFAULT_SYMBOLS=["TQQQ","SOXL"]
 def fetch_alpha_daily(symbol, api_key, outputsize="full", max_retries=6, sleep_sec=60):
-    url="https://www.alphavantage.co/query";params={"function":"TIME_SERIES_DAILY_ADJUSTED","symbol":symbol,"outputsize":outputsize,"apikey":api_key}
-    for k in range(max_retries):
-        r=requests.get(url,params=params,timeout=30);r.raise_for_status();j=r.json()
-        if "Time Series (Daily)" in j:
-            ts=j["Time Series (Daily)"];df=pd.DataFrame.from_dict(ts,orient="index");df.index=pd.to_datetime(df.index)
-            df=df.rename(columns={"1. open":"open","2. high":"high","3. low":"low","4. close":"close","5. adjusted close":"adj_close","6. volume":"volume"})
-            cols=["open","high","low","close","adj_close","volume"]
-            for c in cols: df[c]=pd.to_numeric(df[c],errors="coerce")
-            df=df.sort_index();return df[cols]
-        msg=j.get("Note") or j.get("Information") or "Unknown response"
-        if k==max_retries-1: raise RuntimeError(f"Alpha Vantage: {msg}")
-        time.sleep(sleep_sec)
+    url="https://www.alphavantage.co/query"
+    sizes=[outputsize]
+    # The "full" output size requires a premium key for some endpoints.
+    # If the call fails with a premium message, retry with the free
+    # "compact" size so the backtest can still run with a basic key.
+    if outputsize=="full":
+        sizes.append("compact")
+    for osize in sizes:
+        params={"function":"TIME_SERIES_DAILY_ADJUSTED","symbol":symbol,
+                "outputsize":osize,"apikey":api_key}
+        for k in range(max_retries):
+            r=requests.get(url,params=params,timeout=30);r.raise_for_status();j=r.json()
+            if "Time Series (Daily)" in j:
+                ts=j["Time Series (Daily)"];df=pd.DataFrame.from_dict(ts,orient="index");df.index=pd.to_datetime(df.index)
+                df=df.rename(columns={"1. open":"open","2. high":"high","3. low":"low","4. close":"close","5. adjusted close":"adj_close","6. volume":"volume"})
+                cols=["open","high","low","close","adj_close","volume"]
+                for c in cols: df[c]=pd.to_numeric(df[c],errors="coerce")
+                df=df.sort_index();return df[cols]
+            msg=j.get("Note") or j.get("Information") or j.get("Error Message") or "Unknown response"
+            # if we receive a premium endpoint message while requesting
+            # the full dataset, break and try the smaller compact size
+            if "premium" in msg.lower() and osize=="full":
+                break
+            if k==max_retries-1: raise RuntimeError(f"Alpha Vantage: {msg}")
+            time.sleep(sleep_sec)
     raise RuntimeError("Alpha Vantage retry loop exited unexpectedly")
 def compute_features(dfd):
     px=dfd["adj_close"].copy();feats=pd.DataFrame(index=dfd.index);r1=px.pct_change();feats["ret_1"]=r1
