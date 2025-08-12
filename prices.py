@@ -1,54 +1,68 @@
-import os, sys, time, json, pandas as pd, requests
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from tools.utils import ts_now_iso, ensure_dir, json_dump
 
-OUT_JSON = "docs/prices.json"
-AV_KEY = os.environ.get("ALPHAVANTAGE_API_KEY","").strip()
-TICKERS = [t.strip().upper() for t in os.environ.get("PRICES_TICKERS","SPY,QQQ,TQQQ,SOXL").split(",") if t.strip()]
+import os, json, time
+import pandas as pd
+import requests
+import yfinance as yf
 
-def fetch_av_daily(symbol: str):
-    url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol={symbol}&outputsize=compact&apikey={AV_KEY}"
-    r = requests.get(url, timeout=30)
+try:
+    from core.utils import ensure_dir, write_json, ts_now_iso
+except Exception:
+    from tools.utils import ensure_dir, write_json, ts_now_iso
+
+OUT = "docs/prices.json"
+DEFAULT_TICKERS = os.getenv("PRICES_TICKERS", "SPY,QQQ,TQQQ").replace(" ", "").split(",")
+AV_KEY = os.getenv("ALPHAVANTAGE_API_KEY", "").strip()
+
+def fetch_alpha_vantage(symbol: str, api_key: str):
+    url = "https://www.alphavantage.co/query"
+    params = {
+        "function": "TIME_SERIES_DAILY_ADJUSTED",
+        "symbol": symbol,
+        "apikey": api_key,
+        "outputsize": "compact"
+    }
+    r = requests.get(url, params=params, timeout=30)
     r.raise_for_status()
-    js = r.json()
-    ts = js.get("Time Series (Daily)", {})
-    if not ts:
-        raise RuntimeError(f"AV empty for {symbol}: {js}")
-    items = sorted(ts.items())[-2:]
-    last_date, last = items[-1]
-    prev_date, prev = items[-2]
-    last_c = float(last["5. adjusted close"])
-    prev_c = float(prev["5. adjusted close"])
-    chg = (last_c/prev_c - 1.0) * 100.0
-    return {"price": round(last_c, 4), "change_pct": round(chg, 3), "date": last_date}
+    data = r.json()
+    if "Note" in data or "Information" in data or "Error Message" in data:
+        raise RuntimeError("AV premium or rate limited")
+    ts = data.get("Time Series (Daily)") or {}
+    rows = sorted(ts.items())
+    out = []
+    for d, row in rows:
+        out.append([d, float(row.get("5. adjusted close") or row.get("4. close") or 0.0)])
+    return out
 
-def fetch_yf_last(symbol: str):
-    import yfinance as yf
-    df = yf.download(symbol, period="10d", interval="1d", auto_adjust=True, progress=False, threads=False)
-    if df is None or df.empty or len(df) < 2: 
-        raise RuntimeError("yf empty")
-    last = float(df["Close"].iloc[-1])
-    prev = float(df["Close"].iloc[-2])
-    chg = (last/prev - 1.0) * 100.0
-    last_date = df.index[-1].strftime("%Y-%m-%d")
-    return {"price": round(last,4), "change_pct": round(chg,3), "date": last_date}
+def fetch_yf(symbol: str):
+    df = yf.download(symbol, period="2y", interval="1d", auto_adjust=True, progress=False, threads=False)
+    if df is None or df.empty:
+        return []
+    s = df["Close"]
+    return [[pd.to_datetime(ix).strftime("%Y-%m-%d"), float(v)] for ix, v in s.dropna().items()]
 
 def main():
-    out = {"as_of": ts_now_iso(), "symbols": {}}
-    for i, sym in enumerate(TICKERS):
-        try:
-            if AV_KEY:
-                # AV 限速 5/min，简单节流
-                if i and i % 4 == 0:
-                    time.sleep(15)
-                out["symbols"][sym] = fetch_av_daily(sym)
-            else:
-                out["symbols"][sym] = fetch_yf_last(sym)
-        except Exception as e:
-            print(f"[warn] price fetch failed for {sym}:", e)
-            out["symbols"][sym] = None
-    json_dump(out, OUT_JSON)
-    print(f"wrote {OUT_JSON} for {len(TICKERS)} symbols")
+    tickers = [t for t in DEFAULT_TICKERS if t]
+    prices = {}
+    meta = {"tickers": tickers, "source": ""}
+    for t in tickers:
+        series = []
+        used = None
+        if AV_KEY:
+            try:
+                series = fetch_alpha_vantage(t, AV_KEY); used="alphavantage"
+            except Exception:
+                series = []
+        if not series:
+            try:
+                series = fetch_yf(t); used="yfinance"
+            except Exception:
+                series = []
+        if series:
+            prices[t] = series
+    meta["source"] = used or "none"
+    out = {"as_of": ts_now_iso(), "prices": prices, "meta": meta}
+    write_json(OUT, out)
+    print(f"wrote {OUT} tickers={list(prices)} source={meta['source']}")
 
 if __name__ == "__main__":
     main()
