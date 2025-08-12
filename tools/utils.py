@@ -32,4 +32,4 @@ def to_json_ready(df: pd.DataFrame, ts_col=None, val_col=None):
 def write_json(path: str, obj: dict):
     ensure_dir(path)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False)
+        json.dump(obj, f, ensure_ascii=False, indent=2)

@@ -1,5 +1,14 @@
+# --- repo path bootstrap (CI/CLI 双保险) ---
+import os, sys
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+THIS = os.path.dirname(__file__)
+if THIS in sys.path:
+    sys.path.remove(THIS)
+# ------------------------------------------
 
-import os, json, time
+import json, time
 import pandas as pd
 import requests
 import yfinance as yf
