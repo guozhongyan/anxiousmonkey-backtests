@@ -1,5 +1,19 @@
+# --- repo path bootstrap (CI/CLI 双保险) ---
+import os, sys
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+THIS = os.path.dirname(__file__)
+if THIS in sys.path:
+    sys.path.remove(THIS)
+# ------------------------------------------
+
 import json
-from core.utils import ts_now_iso, write_json
+
+try:
+    from core.utils import ts_now_iso, write_json
+except Exception:
+    from tools.utils import ts_now_iso, write_json
 
 IN = "docs/factors_namm50.json"
 OUT = "docs/models/namm50.json"
