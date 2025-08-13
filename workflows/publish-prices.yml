@@ -1,10 +1,14 @@
-
 name: publish-prices
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 20 * * 1-5"   # daily weekdays 20:00 UTC
+    - cron: '*/30 13-21 * * 1-5'   # 每30分钟（美股交易时段 UTC 13–21）
+  push:
+    paths:
+      - 'fetchers/prices.py'
+      - '.github/workflows/publish-prices.yml'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,18 +19,16 @@ jobs:
           python-version: '3.11'
       - name: Install deps
         run: |
-          pip install --upgrade pip
-          pip install requests pandas python-dateutil
+          python -m pip install --upgrade pip
+          pip install requests
       - name: Fetch prices
         env:
           ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python fetchers/prices.py
+        run: python fetchers/prices.py
       - name: Commit prices.json
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/prices.json || true
-          git commit -m "Update prices.json [skip ci]" || echo "no price changes"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/prices.json
+          git commit -m "Update prices.json [skip ci]" || echo "No changes"
           git push
