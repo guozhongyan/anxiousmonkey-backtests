@@ -1,42 +1,69 @@
-
 name: publish-factors
+
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '30 14 * * 1-5' # 工作日 22:30 北京时间
   push:
     paths:
       - 'fetchers/**'
       - 'pipelines/**'
       - 'tools/**'
       - '.github/workflows/publish-factors.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-factors
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install deps
         run: |
-          python -m pip install --upgrade pip
-          pip install pandas numpy requests beautifulsoup4 yfinance html5lib lxml
+          pip install -U pandas requests beautifulsoup4 yfinance python-dateutil certifi
+
       - name: Ensure packages
+        run: mkdir -p fetchers pipelines tools docs data/raw core
+
+      # 抓取数据（按你仓库已有脚本，可为空跑不失败）
+      - name: Fetch NAAIM (robust)
         run: |
-          mkdir -p data/raw docs models fetchers pipelines tools
+          python fetchers/naaim.py || true
+
       - name: Compose factors_namm50.json (minimal)
         run: |
-          python - << 'PY'
-          import json, os, pandas as pd
-          as_of = pd.Timestamp.utcnow().isoformat()+"Z"
-          out = {"as_of":as_of, "factors":{}}
-          os.makedirs("docs", exist_ok=True)
-          with open("docs/factors_namm50.json","w") as f: json.dump(out, f)
-          print("wrote docs/factors_namm50.json")
-          PY
+          python pipelines/compose_outputs.py
+
+      # 避免 non-fast-forward：fetch + rebase 再 push
       - name: Commit docs
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main
+          git pull --rebase origin main
+
           git add docs/factors_namm50.json || true
-          git commit -m "Update factors_namm50 [skip ci]" || echo "no changes"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update factors_namm50 [skip ci]"
+            git push origin HEAD:main
+          fi
