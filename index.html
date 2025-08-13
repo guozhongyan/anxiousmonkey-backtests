@@ -1,69 +1,24 @@
+
 <!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Anxious Monkey — Live</title>
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="dot"></span>
-      <span>Anxious Monkey – <em>Live</em></span>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Anxious Monkey</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <style>
+      body{background:#0b0f17;color:#e6eefc;font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:48px}
+      a{color:#8ab4ff;text-decoration:none}
+      .card{max-width:720px;margin:0 auto;background:#121826;border:1px solid #1d2333;border-radius:14px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+      h1{margin:0 0 8px 0;font-weight:700}
+      p{opacity:.8}
+      .cta{display:inline-block;margin-top:16px;padding:10px 16px;background:#1a73e8;border-radius:10px;color:#fff}
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Anxious Monkey – Live</h1>
+      <p>Open the Live Alpha app.</p>
+      <a class="cta" href="./app/">Open App →</a>
     </div>
-    <div class="actions">
-      <button id="btnRefresh">Refresh</button>
-      <span id="asof"></span>
-    </div>
-  </header>
-
-  <main class="grid">
-    <section class="kpis">
-      <div class="kpi-card"><div class="kpi-title">NAAIM</div><div id="kpi-naaim" class="kpi-value">—</div></div>
-      <div class="kpi-card"><div class="kpi-title">&gt;50DMA (NDX)</div><div id="kpi-ndx50" class="kpi-value">—</div></div>
-      <div class="kpi-card"><div class="kpi-title">China (FXI)</div><div id="kpi-china" class="kpi-value">—</div></div>
-      <div class="kpi-card"><div class="kpi-title">FRED Macro</div><div id="kpi-fred" class="kpi-value">—</div></div>
-    </section>
-
-    <section class="panel w2">
-      <h3>Factor Weights</h3>
-      <canvas id="wChart" height="260"></canvas>
-      <div id="weight-legend" class="legend"></div>
-    </section>
-
-    <section class="panel w2">
-      <h3>Playbook</h3>
-      <div id="playbook" class="playbook">—</div>
-    </section>
-
-    <section class="panel">
-      <h3>NAAIM Exposure</h3>
-      <canvas id="naaimChart" height="140"></canvas>
-    </section>
-
-    <section class="panel">
-      <h3>&gt;50DMA Breadth (NDX)</h3>
-      <canvas id="ndxChart" height="140"></canvas>
-    </section>
-
-    <section class="panel">
-      <h3>China Proxy (FXI)</h3>
-      <canvas id="chinaChart" height="140"></canvas>
-    </section>
-
-    <section class="panel">
-      <h3>FRED Macro (DGS10, DFF)</h3>
-      <canvas id="fredChart" height="140"></canvas>
-    </section>
-
-    <section class="panel w2">
-      <h3>Spot</h3>
-      <div id="spot" class="spot">Loading…</div>
-    </section>
-  </main>
-
-  <script src="app.js"></script>
-</body>
+  </body>
 </html>

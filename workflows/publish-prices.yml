@@ -1,9 +1,10 @@
+
 name: publish-prices
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/30 13-21 * * 1-5"
-
+    - cron: "0 20 * * 1-5"   # daily weekdays 20:00 UTC
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,31 +14,19 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install deps
-        run: pip install requests
-      - name: Fetch prices (AlphaVantage GLOBAL_QUOTE)
+        run: |
+          pip install --upgrade pip
+          pip install requests pandas python-dateutil
+      - name: Fetch prices
         env:
           ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          python - <<'PY'
-          import os, json, time, requests, pathlib
-          KEY = os.environ.get('ALPHAVANTAGE_API_KEY', '').strip()
-          if not KEY:
-              raise SystemExit("ALPHAVANTAGE_API_KEY is empty; set repo secret first.")
-          def q(sym):
-              url=f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={sym}&apikey={KEY}'
-              r=requests.get(url,timeout=20); r.raise_for_status()
-              d=r.json().get('Global Quote',{})
-              price=float(d.get('05. price', '0') or 0)
-              return {"symbol":sym, "price":price, "ts":int(time.time())}
-          out={"quotes":[q("SPY"), q("QQQ"), q("TQQQ")]}
-          pathlib.Path("docs").mkdir(parents=True, exist_ok=True)
-          with open("docs/prices.json","w") as f: json.dump(out,f)
-          print("wrote docs/prices.json", out)
-          PY
+          python fetchers/prices.py
       - name: Commit prices.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/prices.json
-          git commit -m "Update prices.json [skip ci]" || echo "No changes"
+          git add docs/prices.json || true
+          git commit -m "Update prices.json [skip ci]" || echo "no price changes"
           git push

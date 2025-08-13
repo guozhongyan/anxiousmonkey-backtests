@@ -1,42 +1,84 @@
 
 name: publish-factors
+
 on:
   workflow_dispatch:
   push:
+    branches: [ main ]
     paths:
       - 'fetchers/**'
       - 'pipelines/**'
       - 'tools/**'
+      - 'core/**'
       - '.github/workflows/publish-factors.yml'
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy requests beautifulsoup4 yfinance html5lib lxml
+          pip install pandas requests beautifulsoup4 yfinance python-dateutil numpy
+
       - name: Ensure packages
         run: |
-          mkdir -p data/raw docs models fetchers pipelines tools
-      - name: Compose factors_namm50.json (minimal)
+          mkdir -p fetchers pipelines tools core models docs data/raw
+
+      - name: Fetch NAAIM (robust)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          python - << 'PY'
-          import json, os, pandas as pd
-          as_of = pd.Timestamp.utcnow().isoformat()+"Z"
-          out = {"as_of":as_of, "factors":{}}
-          os.makedirs("docs", exist_ok=True)
-          with open("docs/factors_namm50.json","w") as f: json.dump(out, f)
-          print("wrote docs/factors_namm50.json")
+          if [ -f fetchers/naaim.py ]; then python fetchers/naaim.py || true; fi
+
+      - name: Compose factors_namm50.json (fallback if pipeline missing)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          if python - <<'PY'
+          try:
+              import pipelines.compose_outputs as co
+              if hasattr(co, 'main'):
+                  co.main()
+              else:
+                  raise SystemExit(1)
+          except Exception as e:
+              raise SystemExit(1)
           PY
+          then
+            echo "compose_outputs updated factors."
+          else
+            echo "compose_outputs module not present or failed; writing minimal factors file"
+            python - <<'PY'
+import os, json, datetime
+from core.utils import ensure_dir, ts_now_iso
+ensure_dir("docs")
+ensure_dir("docs")
+data = {
+  "as_of": ts_now_iso(),
+  "factors": {
+     "naaim_exposure": {"series": []},
+     "fred_macro": {"series": []},
+     "ndx_breadth": {"series": None},
+     "china_proxy": {"series": None}
+  }
+}
+with open("docs/factors_namm50.json","w") as f:
+    json.dump(data,f)
+print("wrote docs/factors_namm50.json")
+PY
+          fi
+
       - name: Commit docs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/factors_namm50.json || true
-          git commit -m "Update factors_namm50 [skip ci]" || echo "no changes"
+          git commit -m "Update NAMM-50 factors & overlays [skip ci]" || echo "no changes"
           git push
