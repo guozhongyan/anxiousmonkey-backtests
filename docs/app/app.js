@@ -1,114 +1,100 @@
-const ROOT = location.pathname.includes('/anxiousmonkey-backtests/') ? '/anxiousmonkey-backtests/' : '/';
-const FACTORS_URL = ROOT + 'factors_namm50.json';
-const MODELS_URL = ROOT + 'models/namm50.json';
-const PRICES_URL = ROOT + 'prices.json';
 
-async function fetchJson(url, retries=3){
-  for(let i=0;i<retries;i++){
-    try{
-      const res = await fetch(url);
-      if(!res.ok) throw new Error(res.status);
-      return await res.json();
-    }catch(e){
-      if(i===retries-1) return null;
-      await new Promise(r=>setTimeout(r,500));
-    }
+const BASE = 'https://guozhongyan.github.io/anxiousmonkey-backtests';
+const FACTORS_URL = `${BASE}/factors_namm50.json`;
+const MODEL_URL   = `${BASE}/models/namm50.json`;
+const PRICES_URL  = `${BASE}/prices.json`;
+
+function fmtNum(v, digits=2) {
+  if (v === null || v === undefined || Number.isNaN(v)) return '—';
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '—';
+  return n.toLocaleString(undefined, {maximumFractionDigits: digits});
+}
+async function fetchJson(url) {
+  const u = `${url}?t=${Date.now()}`;
+  const res = await fetch(u, {cache:'no-store'});
+  if (!res.ok) throw new Error(`HTTP ${res.status} @ ${u}`);
+  return res.json();
+}
+function parseSeries(arr) {
+  const xs=[], ys=[];
+  if (!Array.isArray(arr)) return {xs,ys};
+  for (const item of arr) {
+    if (!Array.isArray(item) || item.length < 2) continue;
+    let d, v;
+    if (item.length>=3) { d=item[0]; v=item[2]; }
+    else { d=item[0]; v=item[1]; }
+    const y = Number(v);
+    if (!Number.isFinite(y)) continue;
+    xs.push(d); ys.push(y);
   }
+  return {xs,ys};
 }
-
-function getLatest(series){
-  if(!series || !series.length) return null;
-  const last = series[series.length-1];
-  for(let i=last.length-1;i>=0;i--){
-    const v = Number(last[i]);
-    if(!isNaN(v)) return v;
-  }
-  return null;
+function ensureChart(ctx, type, data, opts){
+  if (!ctx) return null;
+  if (ctx._amChart) { ctx._amChart.destroy(); }
+  ctx._amChart = new Chart(ctx, { type, data, options: opts || {responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:true,grid:{color:'rgba(255,255,255,.05)'}} } } });
+  return ctx._amChart;
 }
-
-function updateKpi(id,val){
-  document.getElementById(id).textContent = val!=null ? val.toFixed(1) : '—';
+function renderWeights(model){
+  const weights = (model && model.weights) || {};
+  const labels = Object.keys(weights);
+  const vals   = labels.map(k=>Number(weights[k]||0));
+  const colors = ['#7aa2ff','#8bd2fd','#7de3c1','#ffd47e','#f8a0d4','#c6b6ff','#a8ffbf','#ffb4b4'];
+  const ds = { labels, datasets:[{ data:vals, backgroundColor:labels.map((_,i)=>colors[i%colors.length]), borderWidth:0 }] };
+  const ctx = document.getElementById('wChart').getContext('2d');
+  ensureChart(ctx,'doughnut', ds, {plugins:{legend:{display:false}}});
+  const legend = document.getElementById('weight-legend');
+  legend.innerHTML = labels.map((l,i)=>`<span class="badge">${l}: ${fmtNum(vals[i]*100,2)}%</span>`).join(' ');
 }
-
-function renderWeights(weights){
-  const map = {NAAM:'NAAIM',NAAIM:'NAAIM',NAMM:'NAAIM',FRED:'FRED',NDX50:'NDX50',CHINA:'CHINA'};
-  const container = document.getElementById('weights');
-  container.innerHTML='';
-  Object.entries(weights||{}).forEach(([k,v])=>{
-    if(!(k in map)) return;
-    const pct = (v*100).toFixed(0);
-    const row = document.createElement('div');
-    row.className='weight-row';
-    row.innerHTML = `<span class="w-label">${map[k]}</span>`+
-      `<div class="w-bar"><div class="w-fill" style="width:${pct}%"></div></div>`+
-      `<span class="w-val">${pct}%</span>`;
-    container.appendChild(row);
+function renderPlaybook(model){
+  const note = (model && model.latest && model.latest.note) || 'Playbook: Neutral · 观察为主；仅在强信号共振时加减仓，保持中性敞口。';
+  document.getElementById('playbook').textContent = note;
+}
+function renderKPI(series, id){
+  const ys = parseSeries(series).ys;
+  const last = ys.length ? ys[ys.length-1] : null;
+  document.getElementById(id).textContent = fmtNum(last, 2);
+}
+function renderLine(canvasId, series){
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const {xs, ys} = parseSeries(series);
+  ensureChart(el.getContext('2d'),'line', {
+    labels: xs,
+    datasets:[{data:ys, borderWidth:1.5, pointRadius:0, tension:.2}]
   });
 }
-
-function renderPlaybook(stats){
-  const pb = document.getElementById('playbook');
-  let text='Neutral';
-  if(stats.naaim>75 && stats.ndx50>50) text='Risk-On';
-  else if(stats.naaim<25 && stats.ndx50<50) text='Risk-Off';
-  pb.textContent=text;
+function renderFactors(j){
+  const f = (j && j.factors) || {};
+  const asof = (j && j.as_of) ? new Date(j.as_of) : null;
+  if (asof) document.getElementById('asof').textContent = `Last updated ${asof.toLocaleString()}`;
+  if (f.naaim_exposure?.series){ renderKPI(f.naaim_exposure.series, 'kpi-naaim'); renderLine('naaimChart', f.naaim_exposure.series); }
+  if (f.ndx_breadth?.series){ renderKPI(f.ndx_breadth.series, 'kpi-ndx50'); renderLine('ndxChart', f.ndx_breadth.series); }
+  if (f.china_proxy?.series){ renderKPI(f.china_proxy.series, 'kpi-china'); renderLine('chinaChart', f.china_proxy.series); }
+  if (f.fred_macro?.series){ renderKPI(f.fred_macro.series, 'kpi-fred'); renderLine('fredChart', f.fred_macro.series); }
 }
-
-function toSeries(arr){
-  if(!arr) return [];
-  return arr.map(pt=>{
-    const [d,...vals]=pt;
-    const value = Number(vals.reverse().find(v=>!isNaN(v)));
-    return {time:d, value};
-  });
-}
-
-function renderChart(id,series){
-  if(!series || !series.length) return;
-  const el = document.getElementById(id);
-  const chart = LightweightCharts.createChart(el,{height:240,layout:{textColor:'#e9eef6',background:{type:'solid',color:'transparent'}},grid:{vertLines:{color:'#2a3142'},horzLines:{color:'#2a3142'}},rightPriceScale:{borderColor:'#2a3142'},timeScale:{borderColor:'#2a3142'}});
-  const line = chart.addLineSeries({color:'#6ea8fe'});
-  line.setData(toSeries(series));
-}
-
+function renderModel(j){ renderWeights(j||{}); renderPlaybook(j||{}); }
 function renderSpot(prices){
-  const el = document.getElementById('spot');
-  if(!prices || !prices.prices){el.textContent='—';return;}
-  const tickers=['SPY','QQQ','TQQQ'];
-  el.textContent = tickers.map(t=>`${t}: ${prices.prices[t]??'—'}`).join(' | ');
+  const box = document.getElementById('spot');
+  const arr = (prices && prices.quotes) || [];
+  if (!arr.length) { box.textContent = '—'; return; }
+  box.innerHTML = arr.map(q => `<span class="badge">${q.symbol}: ${fmtNum(q.price, 2)}</span>`).join('');
 }
+function renderSpotEmpty(){ document.getElementById('spot').textContent = '—'; }
 
-async function load(){
-  const [factors, models, prices] = await Promise.all([
-    fetchJson(FACTORS_URL),
-    fetchJson(MODELS_URL),
-    fetchJson(PRICES_URL)
-  ]);
-
-  if(factors && factors.as_of){
-    document.getElementById('lastUpdated').textContent = new Date(factors.as_of).toLocaleString();
-  }
-
-  const stats = {
-    naaim: getLatest(factors?.factors?.NAAM || factors?.factors?.NAMM || factors?.factors?.NAAIM),
-    ndx50: getLatest(factors?.factors?.NDX50),
-    china: getLatest(factors?.factors?.CHINA),
-    fred: getLatest(factors?.factors?.FRED)
-  };
-
-  updateKpi('kpiNaaim', stats.naaim);
-  updateKpi('kpiNdx50', stats.ndx50);
-  updateKpi('kpiChina', stats.china);
-  updateKpi('kpiFred', stats.fred);
-
-  if(models && models.weights) renderWeights(models.weights);
-  renderPlaybook(stats);
-  renderChart('naaimChart', factors?.factors?.NAAM || factors?.factors?.NAMM || factors?.factors?.NAAIM);
-  renderChart('ndxChart', factors?.factors?.NDX50);
-  renderChart('chinaChart', factors?.factors?.CHINA);
-  renderChart('fredChart', factors?.factors?.FRED);
-  renderSpot(prices);
+async function loadAll(){
+  try{
+    const [factors, model, prices] = await Promise.all([
+      fetchJson(FACTORS_URL),
+      fetchJson(MODEL_URL),
+      fetchJson(PRICES_URL).catch(()=>null)
+    ]);
+    renderFactors(factors);
+    renderModel(model);
+    if (prices) renderSpot(prices); else renderSpotEmpty();
+  }catch(e){ alert(`加载失败: ${e.message}`); console.error(e); }
 }
-
-document.getElementById('refreshBtn').addEventListener('click', load);
-load();
+document.getElementById('btnRefresh').addEventListener('click', loadAll);
+document.addEventListener('DOMContentLoaded', loadAll);

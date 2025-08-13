@@ -1,79 +1,69 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Anxious Monkey — Live</title>
-  <meta name="color-scheme" content="dark">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-  <link rel="stylesheet" href="./styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <div class="page">
-    <header class="topbar glass">
-      <div class="brand">
-        <span class="dot"></span>
-        <h1>Anxious Monkey <span class="sub">– Live</span></h1>
-      </div>
-      <div class="actions">
-        <a href="../trader.html" class="btn">Trading Console</a>
-        <div class="updated"><span>Last updated</span><strong id="lastUpdated">—</strong></div>
-        <button id="refreshBtn" class="btn">Refresh</button>
-      </div>
-    </header>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <span>Anxious Monkey – <em>Live</em></span>
+    </div>
+    <div class="actions">
+      <button id="btnRefresh">Refresh</button>
+      <span id="asof"></span>
+    </div>
+  </header>
 
+  <main class="grid">
     <section class="kpis">
-      <div class="kpi glass"><div class="kpi-h">NAAIM</div><div class="kpi-v" id="kpiNaaim">—</div></div>
-      <div class="kpi glass"><div class="kpi-h">&gt;50DMA (NDX)</div><div class="kpi-v" id="kpiNdx50">—</div></div>
-      <div class="kpi glass"><div class="kpi-h">China (FXI)</div><div class="kpi-v" id="kpiChina">—</div></div>
-      <div class="kpi glass"><div class="kpi-h">FRED Macro</div><div class="kpi-v" id="kpiFred">—</div></div>
+      <div class="kpi-card"><div class="kpi-title">NAAIM</div><div id="kpi-naaim" class="kpi-value">—</div></div>
+      <div class="kpi-card"><div class="kpi-title">&gt;50DMA (NDX)</div><div id="kpi-ndx50" class="kpi-value">—</div></div>
+      <div class="kpi-card"><div class="kpi-title">China (FXI)</div><div id="kpi-china" class="kpi-value">—</div></div>
+      <div class="kpi-card"><div class="kpi-title">FRED Macro</div><div id="kpi-fred" class="kpi-value">—</div></div>
     </section>
 
-    <main class="grid">
-      <section class="card glass">
-        <div class="card-h">Factor Weights</div>
-        <div class="card-b" id="weights"></div>
-      </section>
+    <section class="panel w2">
+      <h3>Factor Weights</h3>
+      <canvas id="wChart" height="260"></canvas>
+      <div id="weight-legend" class="legend"></div>
+    </section>
 
-      <section class="card glass">
-        <div class="card-h">Playbook</div>
-        <div class="card-b"><div id="playbook" class="playbook">—</div></div>
-      </section>
+    <section class="panel w2">
+      <h3>Playbook</h3>
+      <div id="playbook" class="playbook">—</div>
+    </section>
 
-      <section class="card glass">
-        <div class="card-h">NAAIM Exposure</div>
-        <div class="card-b"><div id="naaimChart" class="chart"></div></div>
-      </section>
+    <section class="panel">
+      <h3>NAAIM Exposure</h3>
+      <canvas id="naaimChart" height="140"></canvas>
+    </section>
 
-      <section class="card glass">
-        <div class="card-h">&gt;50DMA Breadth (NDX)</div>
-        <div class="card-b"><div id="ndxChart" class="chart"></div></div>
-      </section>
+    <section class="panel">
+      <h3>&gt;50DMA Breadth (NDX)</h3>
+      <canvas id="ndxChart" height="140"></canvas>
+    </section>
 
-      <section class="card glass">
-        <div class="card-h">China Proxy (FXI)</div>
-        <div class="card-b"><div id="chinaChart" class="chart"></div></div>
-      </section>
+    <section class="panel">
+      <h3>China Proxy (FXI)</h3>
+      <canvas id="chinaChart" height="140"></canvas>
+    </section>
 
-      <section class="card glass">
-        <div class="card-h">FRED Macro (10Y − FF)</div>
-        <div class="card-b"><div id="fredChart" class="chart"></div></div>
-      </section>
+    <section class="panel">
+      <h3>FRED Macro (DGS10, DFF)</h3>
+      <canvas id="fredChart" height="140"></canvas>
+    </section>
 
-      <section class="card glass wide">
-        <div class="card-h">Spot</div>
-        <div class="card-b" id="spot">—</div>
-      </section>
-    </main>
+    <section class="panel w2">
+      <h3>Spot</h3>
+      <div id="spot" class="spot">Loading…</div>
+    </section>
+  </main>
 
-    <footer class="foot">
-      <span>© Anxious Monkey</span>
-      <span><a href="../trader.html">Trading Console</a></span>
-    </footer>
-  </div>
-
-  <div id="toast" class="toast hidden"></div>
-  <script src="./app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

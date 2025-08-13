@@ -1,83 +1,69 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Anxious Monkey — Live</title>
-  <link rel="stylesheet" href="./styles.css"/>
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Anxious Monkey <span class="pill">Live</span></div>
-    <nav>
-      <a class="link" id="brokerLink" href="../index.html">Broker / Webull HK</a>
-      <a class="link" id="rawLink" target="_blank">Raw JSON</a>
-    </nav>
+    <div class="brand">
+      <span class="dot"></span>
+      <span>Anxious Monkey – <em>Live</em></span>
+    </div>
+    <div class="actions">
+      <button id="btnRefresh">Refresh</button>
+      <span id="asof"></span>
+    </div>
   </header>
 
-  <main class="container">
-    <!-- KPI Row -->
-    <section class="kpi-row">
-      <div class="kpi" id="kpi-naaim">
-        <div class="label">NAAIM</div>
-        <div class="value">—</div>
-      </div>
-      <div class="kpi" id="kpi-ndx50">
-        <div class="label">&gt;50DMA (NDX)</div>
-        <div class="value">—</div>
-      </div>
-      <div class="kpi" id="kpi-china">
-        <div class="label">China Proxy (FXI)</div>
-        <div class="value">—</div>
-      </div>
-      <div class="kpi" id="kpi-fred">
-        <div class="label">FRED Macro</div>
-        <div class="value">—</div>
-      </div>
+  <main class="grid">
+    <section class="kpis">
+      <div class="kpi-card"><div class="kpi-title">NAAIM</div><div id="kpi-naaim" class="kpi-value">—</div></div>
+      <div class="kpi-card"><div class="kpi-title">&gt;50DMA (NDX)</div><div id="kpi-ndx50" class="kpi-value">—</div></div>
+      <div class="kpi-card"><div class="kpi-title">China (FXI)</div><div id="kpi-china" class="kpi-value">—</div></div>
+      <div class="kpi-card"><div class="kpi-title">FRED Macro</div><div id="kpi-fred" class="kpi-value">—</div></div>
     </section>
 
-    <section class="grid two">
-      <div class="card">
-        <div class="card-title">Factor Weights</div>
-        <canvas id="weightsChart" height="120"></canvas>
-      </div>
-      <div class="card">
-        <div class="card-title">Playbook</div>
-        <div id="playbook" class="playbook"></div>
-      </div>
+    <section class="panel w2">
+      <h3>Factor Weights</h3>
+      <canvas id="wChart" height="260"></canvas>
+      <div id="weight-legend" class="legend"></div>
     </section>
 
-    <section class="grid three">
-      <div class="card">
-        <div class="card-title">NAAIM Exposure</div>
-        <canvas id="naaimChart" height="140"></canvas>
-      </div>
-      <div class="card">
-        <div class="card-title">&gt;50DMA Breadth (NDX)</div>
-        <canvas id="ndxChart" height="140"></canvas>
-      </div>
-      <div class="card">
-        <div class="card-title">China Proxy (FXI)</div>
-        <canvas id="chinaChart" height="140"></canvas>
-      </div>
+    <section class="panel w2">
+      <h3>Playbook</h3>
+      <div id="playbook" class="playbook">—</div>
     </section>
 
-    <section class="grid one">
-      <div class="card">
-        <div class="card-title">FRED Macro (DGS10, DFF)</div>
-        <canvas id="fredChart" height="160"></canvas>
-      </div>
+    <section class="panel">
+      <h3>NAAIM Exposure</h3>
+      <canvas id="naaimChart" height="140"></canvas>
     </section>
 
-    <footer class="foot">
-      <span id="asof">—</span>
-      <span>•</span>
-      <span><a id="repoLink" target="_blank">Repo</a></span>
-    </footer>
+    <section class="panel">
+      <h3>&gt;50DMA Breadth (NDX)</h3>
+      <canvas id="ndxChart" height="140"></canvas>
+    </section>
+
+    <section class="panel">
+      <h3>China Proxy (FXI)</h3>
+      <canvas id="chinaChart" height="140"></canvas>
+    </section>
+
+    <section class="panel">
+      <h3>FRED Macro (DGS10, DFF)</h3>
+      <canvas id="fredChart" height="140"></canvas>
+    </section>
+
+    <section class="panel w2">
+      <h3>Spot</h3>
+      <div id="spot" class="spot">Loading…</div>
+    </section>
   </main>
 
-  <script src="./app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
