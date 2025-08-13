@@ -1,9 +1,9 @@
 {
-  "as_of": "2025-08-13T20:21:18Z",
+  "as_of": "2025-08-13T20:23:20Z",
   "symbols": [
     {
       "symbol": "SPY",
-      "price": 642.69
+      "price": 644.87
     },
     {
       "symbol": "QQQ",
@@ -19,7 +19,7 @@
     },
     {
       "symbol": "FEZ",
-      "price": 60.31
+      "price": 59.66
     },
     {
       "symbol": "CURE",
