@@ -1,69 +1,53 @@
-name: publish-factors
 
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: '30 14 * * 1-5' # 工作日 22:30 北京时间
-  push:
-    paths:
-      - 'fetchers/**'
-      - 'pipelines/**'
-      - 'tools/**'
-      - '.github/workflows/publish-factors.yml'
+    name: publish-factors
 
-permissions:
-  contents: write
+    on:
+      workflow_dispatch:
+      schedule:
+        - cron: '5 13 * * 1-5'   # 13:05 UTC, weekdays
 
-concurrency:
-  group: publish-factors
-  cancel-in-progress: false
+    permissions:
+      contents: write
+      id-token: write
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+    jobs:
+      build:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+            with:
+              fetch-depth: 0
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: true
+          - uses: actions/setup-python@v5
+            with:
+              python-version: '3.11'
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+          - name: Install deps
+            run: |
+              python -m pip install -U pip
+              pip install requests pandas python-dateutil yfinance beautifulsoup4 lxml
 
-      - name: Install deps
-        run: |
-          pip install -U pandas requests beautifulsoup4 yfinance python-dateutil certifi
+          - name: Ensure packages
+            run: mkdir -p fetchers pipelines tools models namm50 docs data/raw core
 
-      - name: Ensure packages
-        run: mkdir -p fetchers pipelines tools docs data/raw core
+          - name: Fetch NAAIM (robust)
+            run: |
+              python -m fetchers.naaim || true
 
-      # 抓取数据（按你仓库已有脚本，可为空跑不失败）
-      - name: Fetch NAAIM (robust)
-        run: |
-          python fetchers/naaim.py || true
+          - name: Compose factors_namm50.json (minimal)
+            run: |
+              python -m pipelines.compose_outputs
 
-      - name: Compose factors_namm50.json (minimal)
-        run: |
-          python pipelines/compose_outputs.py
 
-      # 避免 non-fast-forward：fetch + rebase 再 push
-      - name: Commit docs
-        run: |
-          set -e
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+- name: Commit docs
+  run: |
+    git config user.name "github-actions[bot]"
+    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    git fetch origin main
+    git pull --rebase origin main
+    git add docs/**/*.json || true
+    git add docs/*.json || true
+    git add docs/models/*.json || true
+    git commit -m "Update docs [hotfix path/core] [skip ci]" || echo "no changes"
+    git push origin HEAD:main
 
-          git fetch origin main
-          git pull --rebase origin main
-
-          git add docs/factors_namm50.json || true
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update factors_namm50 [skip ci]"
-            git push origin HEAD:main
-          fi

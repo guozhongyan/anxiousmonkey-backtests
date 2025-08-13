@@ -1,30 +1,37 @@
 
-name: train-models
+    name: train-models
 
-on:
-  workflow_dispatch:
+    on:
+      workflow_dispatch:
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install numpy pandas
-      - name: Train NAMM-50
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python models/namm50/train.py
-      - name: Commit model/backtests
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/models/namm50.json || true
-          git commit -m "Publish NAMM-50 model [skip ci]" || echo "no model changes"
-          git push
+    permissions:
+      contents: write
+
+    jobs:
+      build:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+            with: { fetch-depth: 0 }
+          - uses: actions/setup-python@v5
+            with: { python-version: '3.11' }
+          - name: Install deps
+            run: |
+              python -m pip install -U pip
+              pip install pandas numpy peewee openpyxl python-dateutil requests beautifulsoup4 lxml
+          - name: Train NAMM-50 (free)
+            run: |
+              python -m models.namm50.train
+
+- name: Commit docs
+  run: |
+    git config user.name "github-actions[bot]"
+    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    git fetch origin main
+    git pull --rebase origin main
+    git add docs/**/*.json || true
+    git add docs/*.json || true
+    git add docs/models/*.json || true
+    git commit -m "Update docs [hotfix path/core] [skip ci]" || echo "no changes"
+    git push origin HEAD:main
+
