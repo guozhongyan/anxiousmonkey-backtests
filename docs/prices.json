@@ -1,12 +1,1 @@
-{
-  "as_of": "2025-08-13T11:37:35+00:00Z",
-  "prices": {},
-  "meta": {
-    "tickers": [
-      "SPY",
-      "QQQ",
-      "TQQQ"
-    ],
-    "source": "none"
-  }
-}
+{"quotes": [{"symbol": "SPY", "price": 642.69, "ts": 1755115752}, {"symbol": "QQQ", "price": 580.05, "ts": 1755115752}, {"symbol": "TQQQ", "price": 94.72, "ts": 1755115752}]}
