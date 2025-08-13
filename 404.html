@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8"/>
+<title>Redirecting…</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<script>
+// Redirect any 404 at site root to the /app/ UI (repo-aware)
+(function(){
+  var parts = location.pathname.split('/').filter(Boolean);
+  if(parts.length>=1){
+    var repo = parts[0]; // works for user pages with repo path
+    var tgt = '/' + repo + '/app/';
+    location.replace(tgt);
+  }else{
+    location.replace('/app/');
+  }
+})();
+</script>
+</head><body>
+Redirecting…
+</body></html>
