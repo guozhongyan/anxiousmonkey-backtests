@@ -1,24 +1,14 @@
 {
-  "as_of": "2025-08-13T11:37:23+00:00Z",
+  "as_of": "2025-08-13T20:14:29Z",
   "model": "NAMM-50",
-  "version": "v0.2.0",
+  "version": "v0.1-hotfix",
   "weights": {
     "NAAM": 1.0,
     "FRED": 0.0,
     "NDX50": 0.0,
-    "CHINA": 0.0,
-    "VIXCLS": 0.0,
-    "CURVE10Y2Y": 0.0,
-    "CURVE10Y3M": 0.0,
-    "DGS10": 0.0,
-    "DFF": 0.0,
-    "DFII10": 0.0,
-    "UNRATE": 0.0,
-    "CPIAUCSL": 0.0,
-    "BAMLH0A0HYM2": 0.0,
-    "MOMQQQ12M1M": 0.0,
-    "RSIQQQ14": 0.0,
-    "RSISPY14": 0.0,
-    "ATRQQQ14": 0.0
+    "CHINA": 0.0
+  },
+  "latest": {
+    "note": "Hotfix writes model JSON to docs/models/namm50.json"
   }
 }
