@@ -1,24 +1,100 @@
-
 <!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8"/>
-    <title>Anxious Monkey</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <style>
-      body{background:#0b0f17;color:#e6eefc;font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:48px}
-      a{color:#8ab4ff;text-decoration:none}
-      .card{max-width:720px;margin:0 auto;background:#121826;border:1px solid #1d2333;border-radius:14px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-      h1{margin:0 0 8px 0;font-weight:700}
-      p{opacity:.8}
-      .cta{display:inline-block;margin-top:16px;padding:10px 16px;background:#1a73e8;border-radius:10px;color:#fff}
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>Anxious Monkey – Live</h1>
-      <p>Open the Live Alpha app.</p>
-      <a class="cta" href="./app/">Open App →</a>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anxious Monkey — Live</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot live"></span> <strong>Anxious Monkey</strong> <span class="muted">— Live</span>
     </div>
-  </body>
+    <div class="actions">
+      <button id="btnConsole" class="btn subtle">Trading Console</button>
+      <span id="lastUpdated" class="muted"></span>
+      <button id="btnRefresh" class="btn">Refresh</button>
+    </div>
+  </header>
+
+  <section class="stat-row">
+    <div class="stat" id="card-naaim">
+      <div class="title">NAAIM <span class="badge" id="live-naaim">—</span></div>
+      <div class="value" id="v-naaim">—</div>
+    </div>
+    <div class="stat" id="card-ndx50">
+      <div class="title">&gt;50DMA (NDX) <span class="badge" id="live-ndx50">—</span></div>
+      <div class="value" id="v-ndx50">—</div>
+    </div>
+    <div class="stat" id="card-china">
+      <div class="title">China (FXI) <span class="badge" id="live-china">—</span></div>
+      <div class="value" id="v-china">—</div>
+    </div>
+    <div class="stat" id="card-fred">
+      <div class="title">FRED Macro <span class="badge" id="live-fred">—</span></div>
+      <div class="value" id="v-fred">—</div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="card">
+      <div class="card-header">Factor Weights</div>
+      <div class="card-body">
+        <div id="weightsEmpty" class="empty" hidden>暂无模型权重数据</div>
+        <canvas id="weightsChart" height="220"></canvas>
+        <div id="weightsLegend" class="legend"></div>
+      </div>
+      <div class="card-footer">
+        <div id="factorFlags" class="pill-row"></div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-header">Playbook</div>
+      <div class="card-body">
+        <p id="playbook">生成中…</p>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-header">Prediction</div>
+      <div class="card-body">
+        <div class="predict">
+          <div class="row">
+            <div>
+              <div class="label">综合得分</div>
+              <div class="big" id="score">—</div>
+            </div>
+            <div>
+              <div class="label">上涨概率</div>
+              <div class="big" id="probUp">—</div>
+            </div>
+            <div>
+              <div class="label">倾向</div>
+              <div class="big" id="tilt">—</div>
+            </div>
+          </div>
+          <div class="hint muted">* 概率为启发式估计，真实交易请以模型后端结果为准。</div>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-header">Spot</div>
+      <div class="card-body">
+        <div class="chips" id="spotRow">
+          <span class="chip skeleton">Loading…</span>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <footer class="footer muted">
+    <span>Frontend Hotfix v3 • 防抖与容错增强 • 画布错误修复 • 统一数据状态指示</span>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
 </html>

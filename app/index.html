@@ -4,66 +4,97 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Anxious Monkey — Live</title>
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="dot"></span>
-      <span>Anxious Monkey – <em>Live</em></span>
+      <span class="dot live"></span> <strong>Anxious Monkey</strong> <span class="muted">— Live</span>
     </div>
     <div class="actions">
-      <button id="btnRefresh">Refresh</button>
-      <span id="asof"></span>
+      <button id="btnConsole" class="btn subtle">Trading Console</button>
+      <span id="lastUpdated" class="muted"></span>
+      <button id="btnRefresh" class="btn">Refresh</button>
     </div>
   </header>
 
-  <main class="grid">
-    <section class="kpis">
-      <div class="kpi-card"><div class="kpi-title">NAAIM</div><div id="kpi-naaim" class="kpi-value">—</div></div>
-      <div class="kpi-card"><div class="kpi-title">&gt;50DMA (NDX)</div><div id="kpi-ndx50" class="kpi-value">—</div></div>
-      <div class="kpi-card"><div class="kpi-title">China (FXI)</div><div id="kpi-china" class="kpi-value">—</div></div>
-      <div class="kpi-card"><div class="kpi-title">FRED Macro</div><div id="kpi-fred" class="kpi-value">—</div></div>
-    </section>
+  <section class="stat-row">
+    <div class="stat" id="card-naaim">
+      <div class="title">NAAIM <span class="badge" id="live-naaim">—</span></div>
+      <div class="value" id="v-naaim">—</div>
+    </div>
+    <div class="stat" id="card-ndx50">
+      <div class="title">&gt;50DMA (NDX) <span class="badge" id="live-ndx50">—</span></div>
+      <div class="value" id="v-ndx50">—</div>
+    </div>
+    <div class="stat" id="card-china">
+      <div class="title">China (FXI) <span class="badge" id="live-china">—</span></div>
+      <div class="value" id="v-china">—</div>
+    </div>
+    <div class="stat" id="card-fred">
+      <div class="title">FRED Macro <span class="badge" id="live-fred">—</span></div>
+      <div class="value" id="v-fred">—</div>
+    </div>
+  </section>
 
-    <section class="panel w2">
-      <h3>Factor Weights</h3>
-      <canvas id="wChart" height="260"></canvas>
-      <div id="weight-legend" class="legend"></div>
-    </section>
+  <section class="grid">
+    <article class="card">
+      <div class="card-header">Factor Weights</div>
+      <div class="card-body">
+        <div id="weightsEmpty" class="empty" hidden>暂无模型权重数据</div>
+        <canvas id="weightsChart" height="220"></canvas>
+        <div id="weightsLegend" class="legend"></div>
+      </div>
+      <div class="card-footer">
+        <div id="factorFlags" class="pill-row"></div>
+      </div>
+    </article>
 
-    <section class="panel w2">
-      <h3>Playbook</h3>
-      <div id="playbook" class="playbook">—</div>
-    </section>
+    <article class="card">
+      <div class="card-header">Playbook</div>
+      <div class="card-body">
+        <p id="playbook">生成中…</p>
+      </div>
+    </article>
 
-    <section class="panel">
-      <h3>NAAIM Exposure</h3>
-      <canvas id="naaimChart" height="140"></canvas>
-    </section>
+    <article class="card">
+      <div class="card-header">Prediction</div>
+      <div class="card-body">
+        <div class="predict">
+          <div class="row">
+            <div>
+              <div class="label">综合得分</div>
+              <div class="big" id="score">—</div>
+            </div>
+            <div>
+              <div class="label">上涨概率</div>
+              <div class="big" id="probUp">—</div>
+            </div>
+            <div>
+              <div class="label">倾向</div>
+              <div class="big" id="tilt">—</div>
+            </div>
+          </div>
+          <div class="hint muted">* 概率为启发式估计，真实交易请以模型后端结果为准。</div>
+        </div>
+      </div>
+    </article>
 
-    <section class="panel">
-      <h3>&gt;50DMA Breadth (NDX)</h3>
-      <canvas id="ndxChart" height="140"></canvas>
-    </section>
+    <article class="card">
+      <div class="card-header">Spot</div>
+      <div class="card-body">
+        <div class="chips" id="spotRow">
+          <span class="chip skeleton">Loading…</span>
+        </div>
+      </div>
+    </article>
+  </section>
 
-    <section class="panel">
-      <h3>China Proxy (FXI)</h3>
-      <canvas id="chinaChart" height="140"></canvas>
-    </section>
+  <footer class="footer muted">
+    <span>Frontend Hotfix v3 • 防抖与容错增强 • 画布错误修复 • 统一数据状态指示</span>
+  </footer>
 
-    <section class="panel">
-      <h3>FRED Macro (DGS10, DFF)</h3>
-      <canvas id="fredChart" height="140"></canvas>
-    </section>
-
-    <section class="panel w2">
-      <h3>Spot</h3>
-      <div id="spot" class="spot">Loading…</div>
-    </section>
-  </main>
-
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
