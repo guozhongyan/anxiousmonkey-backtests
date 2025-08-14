@@ -1,100 +1,277 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Anxious Monkey — Live</title>
-  <link rel="stylesheet" href="./styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Anxious Monkey — Lite</title>
+<style>
+  :root{
+    --bg: #0f1115;
+    --panel:#171a21;
+    --text:#e7e9ee;
+    --muted:#9aa4b2;
+    --accent:#7aa2f7;
+    --ok:#25c59e;
+    --warn:#f0b90b;
+    --err:#ff6b6b;
+    --chip:#1f2430;
+    --bar:#2a3140;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+    background:var(--bg); color:var(--text);
+    line-height:1.45;
+  }
+  .wrap{max-width:1180px;margin:20px auto;padding:0 16px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  h1{font-size:18px;margin:0}
+  .sub{color:var(--muted);font-size:12px}
+  .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+  .card{
+    background:var(--panel);border-radius:12px;padding:14px 16px;min-height:72px;
+    box-shadow:0 0 0 1px rgba(255,255,255,0.03) inset;
+  }
+  .title{font-size:12px;color:var(--muted);margin-bottom:8px}
+  .value{font-size:18px;font-weight:600}
+  .kpi{display:flex;justify-content:space-between;align-items:center}
+  .health{display:flex;gap:8px;flex-wrap:wrap}
+  .pill{background:var(--chip);color:var(--muted);border-radius:999px;padding:6px 10px;font-size:12px;border:1px solid rgba(255,255,255,0.06)}
+  .pill.ok{color:#a6f4c5;border-color:#2d6a4f}
+  .pill.warn{color:#ffe08a;border-color:#725c11}
+  .pill.err{color:#ffadad;border-color:#7a2222}
+  /* progress list */
+  .list{display:grid;grid-template-columns:1fr;gap:10px}
+  .rowbar{display:grid;grid-template-columns:120px 1fr 64px;gap:10px;align-items:center}
+  .label{color:var(--muted);font-size:12px}
+  .bar{height:8px;background:var(--bar);border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#7aa2f7,#5eead4)}
+  .pct{font-variant-numeric:tabular-nums;text-align:right;color:#c9d4f1;font-size:12px}
+  /* playbook + spot */
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .spot{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{
+    background:var(--chip);border:1px solid rgba(255,255,255,0.06);border-radius:999px;
+    padding:8px 12px;font-size:12px;color:#d6e0ff;
+  }
+  .muted{color:var(--muted);}
+  button.btn{margin-left:auto;background:#22304b;color:#dce7ff;border:1px solid #304566;border-radius:10px;padding:8px 12px;font-size:12px;cursor:pointer}
+  button.btn:hover{filter:brightness(1.1)}
+  @media (max-width:900px){
+    .row{grid-template-columns:repeat(2,1fr)}
+    .twocol{grid-template-columns:1fr}
+  }
+  @media (max-width:560px){
+    .row{grid-template-columns:1fr}
+  }
+</style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="dot live"></span> <strong>Anxious Monkey</strong> <span class="muted">— Live</span>
-    </div>
-    <div class="actions">
-      <button id="btnConsole" class="btn subtle">Trading Console</button>
-      <span id="lastUpdated" class="muted"></span>
-      <button id="btnRefresh" class="btn">Refresh</button>
-    </div>
-  </header>
+  <div class="wrap">
+    <header>
+      <span class="dot" id="liveDot"></span>
+      <h1>Anxious Monkey — <span class="sub">Lite</span></h1>
+      <div class="sub" id="ts"></div>
+      <button class="btn" id="refresh">Refresh</button>
+    </header>
 
-  <section class="stat-row">
-    <div class="stat" id="card-naaim">
-      <div class="title">NAAIM <span class="badge" id="live-naaim">—</span></div>
-      <div class="value" id="v-naaim">—</div>
-    </div>
-    <div class="stat" id="card-ndx50">
-      <div class="title">&gt;50DMA (NDX) <span class="badge" id="live-ndx50">—</span></div>
-      <div class="value" id="v-ndx50">—</div>
-    </div>
-    <div class="stat" id="card-china">
-      <div class="title">China (FXI) <span class="badge" id="live-china">—</span></div>
-      <div class="value" id="v-china">—</div>
-    </div>
-    <div class="stat" id="card-fred">
-      <div class="title">FRED Macro <span class="badge" id="live-fred">—</span></div>
-      <div class="value" id="v-fred">—</div>
-    </div>
-  </section>
+    <!-- Health -->
+    <div class="health" id="health"></div>
 
-  <section class="grid">
-    <article class="card">
-      <div class="card-header">Factor Weights</div>
-      <div class="card-body">
-        <div id="weightsEmpty" class="empty" hidden>暂无模型权重数据</div>
-        <canvas id="weightsChart" height="220"></canvas>
-        <div id="weightsLegend" class="legend"></div>
+    <!-- Top KPIs -->
+    <div class="row" id="kpis">
+      <div class="card"><div class="title">NAAIM</div><div class="value" data-kpi="naaim">—</div></div>
+      <div class="card"><div class="title">&gt;50DMA (NDX)</div><div class="value" data-kpi="ndx50">—</div></div>
+      <div class="card"><div class="title">China (FXI)</div><div class="value" data-kpi="china">—</div></div>
+      <div class="card"><div class="title">FRED Macro</div><div class="value" data-kpi="fred">—</div></div>
+    </div>
+
+    <div class="twocol">
+      <!-- Weights -->
+      <div class="card" id="weights">
+        <div class="title">Factor Weights</div>
+        <div class="list" id="weightsList"></div>
       </div>
-      <div class="card-footer">
-        <div id="factorFlags" class="pill-row"></div>
+
+      <!-- Playbook -->
+      <div class="card" id="playbook">
+        <div class="title">Playbook</div>
+        <div id="playText" class="muted">Waiting for data…</div>
       </div>
-    </article>
+    </div>
 
-    <article class="card">
-      <div class="card-header">Playbook</div>
-      <div class="card-body">
-        <p id="playbook">生成中…</p>
-      </div>
-    </article>
+    <!-- Spot -->
+    <div class="card" style="margin-top:12px">
+      <div class="title">Spot</div>
+      <div class="spot" id="spot"></div>
+    </div>
 
-    <article class="card">
-      <div class="card-header">Prediction</div>
-      <div class="card-body">
-        <div class="predict">
-          <div class="row">
-            <div>
-              <div class="label">综合得分</div>
-              <div class="big" id="score">—</div>
-            </div>
-            <div>
-              <div class="label">上涨概率</div>
-              <div class="big" id="probUp">—</div>
-            </div>
-            <div>
-              <div class="label">倾向</div>
-              <div class="big" id="tilt">—</div>
-            </div>
-          </div>
-          <div class="hint muted">* 概率为启发式估计，真实交易请以模型后端结果为准。</div>
-        </div>
-      </div>
-    </article>
+  </div>
 
-    <article class="card">
-      <div class="card-header">Spot</div>
-      <div class="card-body">
-        <div class="chips" id="spotRow">
-          <span class="chip skeleton">Loading…</span>
-        </div>
-      </div>
-    </article>
-  </section>
+<script>
+const PATHS = {
+  factors: 'factors_namm50.json',          // also tries '/anxiousmonkey-backtests/factors_namm50.json'
+  model:   'models/namm50.json',
+  prices:  'prices.json'
+};
+const WANT_SPOT = ['SPY','QQQ','TQQQ','SOXL','FEZ','CURE'];
 
-  <footer class="footer muted">
-    <span>Frontend Hotfix v3 • 防抖与容错增强 • 画布错误修复 • 统一数据状态指示</span>
-  </footer>
+function tryPaths(rel){
+  const here = rel;
+  const rootGuess = location.pathname.includes('/anxiousmonkey-backtests/')
+        ? '/anxiousmonkey-backtests/'+rel
+        : '/'+rel;
+  return [here, rootGuess];
+}
 
-  <script src="./app.js"></script>
+async function fetchWithFallback(rel){
+  const tries = tryPaths(rel);
+  let lastErr;
+  for(const url of tries){
+    try{
+      const r = await fetch(url,{cache:'no-store'});
+      if(r.ok){return await r.json();}
+      lastErr = new Error('HTTP '+r.status+' @ '+url);
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('Fetch failed: '+rel);
+}
+
+// helpers
+function latestFromSeries(series){
+  if(!series || !series.length) return null;
+  for(let i=series.length-1;i>=0;i--){
+    const item = series[i];
+    let v = null;
+    if(Array.isArray(item)){
+      // [ts, v, ...] or ["2025-01-01", v, ...]
+      v = item.length>1 ? item[1] : null;
+    }else if (typeof item === 'object' && item){
+      v = item.v ?? item.value ?? null;
+    }else if(typeof item === 'number'){ v = item; }
+    if(v !== null && !Number.isNaN(Number(v))) return Number(v);
+  }
+  return null;
+}
+
+function setKPI(key, val){
+  const el = document.querySelector(`[data-kpi="${key}"]`);
+  if(!el) return;
+  el.textContent = (val===null || val===undefined) ? '—' : String(val.toFixed ? val.toFixed(2) : val);
+}
+
+// progress rows
+function addWeightRow(name, weight){
+  const row = document.createElement('div');
+  row.className='rowbar';
+  const label = document.createElement('div'); label.className='label'; label.textContent = name;
+  const bar = document.createElement('div'); bar.className='bar';
+  const fill = document.createElement('i');
+  const pct = Math.max(0, Math.min(100, (Number(weight)||0)*100));
+  fill.style.width = pct.toFixed(0)+'%';
+  bar.appendChild(fill);
+  const pctTxt = document.createElement('div'); pctTxt.className='pct'; pctTxt.textContent = pct.toFixed(0)+'%';
+  row.append(label, bar, pctTxt);
+  document.getElementById('weightsList').appendChild(row);
+}
+
+function setHealthBadge(name, level, msg){
+  const pill = document.createElement('span');
+  pill.className='pill ' + (level||'ok');
+  pill.textContent = name + (msg?(' · '+msg):'');
+  document.getElementById('health').appendChild(pill);
+}
+
+function formatPlaybook(weightsOk, kpiOk){
+  if(!weightsOk && !kpiOk) return 'Playbook: 数据不足，维持中性、降低仓位，等待数据源恢复。';
+  if(weightsOk && !kpiOk) return 'Playbook: 仅依据模型权重进行中性权重配置；等待因子指标更新后再加仓。';
+  if(!weightsOk && kpiOk) return 'Playbook: 仅依据因子读数进行温和倾向调整；风险控制优先。';
+  return 'Playbook: Neutral · 观察为主；仅在强信号共振时加减仓，保持中性敞口。';
+}
+
+function nowISO(){
+  return new Date().toLocaleString();
+}
+
+async function main(){
+  document.getElementById('ts').textContent = 'Last updated ' + nowISO();
+  const health = document.getElementById('health'); health.innerHTML='';
+  document.getElementById('weightsList').innerHTML='';
+  document.getElementById('spot').innerHTML='';
+  document.getElementById('playText').textContent = 'Waiting for data…';
+
+  let model, factors, prices;
+  let weightsOk=false, kpiOk=false;
+
+  // model weights
+  try{
+    model = await fetchWithFallback(PATHS.model);
+    const w = model && model.weights ? model.weights : null;
+    if(w){
+      const names = Object.keys(w);
+      if(names.length){
+        names.forEach(n => addWeightRow(n, w[n]));
+        weightsOk = true;
+        setHealthBadge('model', 'ok', '✓');
+      }else{
+        setHealthBadge('model', 'warn', 'empty');
+      }
+    }else{
+      setHealthBadge('model', 'warn', 'missing weights');
+    }
+  }catch(e){
+    setHealthBadge('model', 'err', 'fetch fail');
+    console.warn('model fetch error', e);
+  }
+
+  // factors
+  try{
+    factors = await fetchWithFallback(PATHS.factors);
+    const fx = factors && factors.factors ? factors.factors : factors;
+    const NAAIM = latestFromSeries(fx?.naaim_exposure?.series);
+    const NDX50 = latestFromSeries(fx?.ndx_breadth?.series);
+    const CHINA = latestFromSeries(fx?.china_proxy?.series);
+    const FRED = latestFromSeries(fx?.fred_macro?.series);
+    setKPI('naaim', NAAIM);
+    setKPI('ndx50', NDX50);
+    setKPI('china', CHINA);
+    setKPI('fred', FRED);
+    if([NAAIM,NDX50,CHINA,FRED].some(v=>typeof v==='number')){
+      kpiOk = true; setHealthBadge('factors','ok','✓');
+    }else{
+      setHealthBadge('factors','warn','no recent values');
+    }
+  }catch(e){
+    setHealthBadge('factors','err','fetch fail');
+    console.warn('factors fetch error', e);
+  }
+
+  // prices / spot
+  try{
+    prices = await fetchWithFallback(PATHS.prices);
+    const spotBox = document.getElementById('spot');
+    let shown=0;
+    WANT_SPOT.forEach(sym=>{
+      const val = prices && (prices[sym] ?? prices[sym?.toUpperCase()]);
+      if(val !== undefined){
+        const chip = document.createElement('span');
+        chip.className='chip'; chip.textContent = `${sym}: ${val}`;
+        spotBox.appendChild(chip); shown++;
+      }
+    });
+    setHealthBadge('spot', shown? 'ok':'warn', shown? `✓ ${shown}`:'none');
+  }catch(e){
+    setHealthBadge('spot','warn','missing');
+  }
+
+  // playbook
+  document.getElementById('playText').textContent = formatPlaybook(weightsOk, kpiOk);
+}
+
+document.getElementById('refresh').addEventListener('click', main);
+main();
+</script>
 </body>
 </html>
