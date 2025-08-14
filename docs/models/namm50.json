@@ -1,7 +1,7 @@
 {
-  "as_of": "2025-08-13T20:14:29Z",
+  "as_of": "2025-08-14T04:17:08Z",
   "model": "NAMM-50",
-  "version": "v0.1-hotfix",
+  "version": "v0.1-hotfix-av-fallback",
   "weights": {
     "NAAM": 1.0,
     "FRED": 0.0,
@@ -9,6 +9,6 @@
     "CHINA": 0.0
   },
   "latest": {
-    "note": "Hotfix writes model JSON to docs/models/namm50.json"
+    "rows": 7992
   }
 }
