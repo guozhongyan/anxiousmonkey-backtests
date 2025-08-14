@@ -1,53 +1,56 @@
+name: publish-factors
 
-    name: publish-factors
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'fetchers/**'
+      - 'pipelines/**'
+      - '.github/workflows/publish-factors.yml'
 
-    on:
-      workflow_dispatch:
-      schedule:
-        - cron: '5 13 * * 1-5'   # 13:05 UTC, weekdays
+permissions:
+  contents: write
 
-    permissions:
-      contents: write
-      id-token: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
 
-    jobs:
-      build:
-        runs-on: ubuntu-latest
-        steps:
-          - uses: actions/checkout@v4
-            with:
-              fetch-depth: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-          - uses: actions/setup-python@v5
-            with:
-              python-version: '3.11'
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-          - name: Install deps
-            run: |
-              python -m pip install -U pip
-              pip install requests pandas python-dateutil yfinance beautifulsoup4 lxml
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-input requests pandas numpy python-dateutil yfinance beautifulsoup4 lxml peewee websockets tzdata
 
-          - name: Ensure packages
-            run: mkdir -p fetchers pipelines tools models namm50 docs data/raw core
+      - name: Ensure packages
+        run: |
+          mkdir -p fetchers pipelines tools models data/raw core docs
 
-          - name: Fetch NAAIM (robust)
-            run: |
-              python -m fetchers.naaim || true
+      - name: Fetch NAAIM (robust)
+        run: |
+          if [ -f fetchers/naaim.py ]; then python fetchers/naaim.py || true; fi
 
-          - name: Compose factors_namm50.json (minimal)
-            run: |
-              python -m pipelines.compose_outputs
+      - name: Compose factors_namm50.json (minimal)
+        run: |
+          if [ -f pipelines/compose_outputs.py ]; then python -m pipelines.compose_outputs; else echo "compose script missing, skip"; fi
 
-
-- name: Commit docs
-  run: |
-    git config user.name "github-actions[bot]"
-    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-    git fetch origin main
-    git pull --rebase origin main
-    git add docs/**/*.json || true
-    git add docs/*.json || true
-    git add docs/models/*.json || true
-    git commit -m "Update docs [hotfix path/core] [skip ci]" || echo "no changes"
-    git push origin HEAD:main
-
+      - name: Commit docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 防止非 fast-forward 导致的 push 失败
+          git pull --rebase origin "${GITHUB_REF_NAME}" || true
+          git add docs || true
+          git commit -m "Update factors_namm50 [skip ci]" || echo "nothing to commit"
+          git push || echo "nothing to push"
