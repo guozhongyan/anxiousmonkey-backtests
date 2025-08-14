@@ -1,1 +1,17 @@
-{"as_of": "2025-08-13T20:10:15.519711+00:00Z", "factors": {}}
+{
+  "as_of": "2025-08-14T02:38:24Z",
+  "factors": {
+    "naaim_exposure": {
+      "series": []
+    },
+    "fred_macro": {
+      "series": []
+    },
+    "ndx_breadth": {
+      "series": null
+    },
+    "china_proxy": {
+      "series": null
+    }
+  }
+}
