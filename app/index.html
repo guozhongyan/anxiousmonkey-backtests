@@ -1,277 +1,324 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Anxious Monkey — Lite</title>
-<style>
-  :root{
-    --bg: #0f1115;
-    --panel:#171a21;
-    --text:#e7e9ee;
-    --muted:#9aa4b2;
-    --accent:#7aa2f7;
-    --ok:#25c59e;
-    --warn:#f0b90b;
-    --err:#ff6b6b;
-    --chip:#1f2430;
-    --bar:#2a3140;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0; font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
-    background:var(--bg); color:var(--text);
-    line-height:1.45;
-  }
-  .wrap{max-width:1180px;margin:20px auto;padding:0 16px}
-  header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-  .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
-  h1{font-size:18px;margin:0}
-  .sub{color:var(--muted);font-size:12px}
-  .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
-  .card{
-    background:var(--panel);border-radius:12px;padding:14px 16px;min-height:72px;
-    box-shadow:0 0 0 1px rgba(255,255,255,0.03) inset;
-  }
-  .title{font-size:12px;color:var(--muted);margin-bottom:8px}
-  .value{font-size:18px;font-weight:600}
-  .kpi{display:flex;justify-content:space-between;align-items:center}
-  .health{display:flex;gap:8px;flex-wrap:wrap}
-  .pill{background:var(--chip);color:var(--muted);border-radius:999px;padding:6px 10px;font-size:12px;border:1px solid rgba(255,255,255,0.06)}
-  .pill.ok{color:#a6f4c5;border-color:#2d6a4f}
-  .pill.warn{color:#ffe08a;border-color:#725c11}
-  .pill.err{color:#ffadad;border-color:#7a2222}
-  /* progress list */
-  .list{display:grid;grid-template-columns:1fr;gap:10px}
-  .rowbar{display:grid;grid-template-columns:120px 1fr 64px;gap:10px;align-items:center}
-  .label{color:var(--muted);font-size:12px}
-  .bar{height:8px;background:var(--bar);border-radius:999px;overflow:hidden}
-  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#7aa2f7,#5eead4)}
-  .pct{font-variant-numeric:tabular-nums;text-align:right;color:#c9d4f1;font-size:12px}
-  /* playbook + spot */
-  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .spot{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{
-    background:var(--chip);border:1px solid rgba(255,255,255,0.06);border-radius:999px;
-    padding:8px 12px;font-size:12px;color:#d6e0ff;
-  }
-  .muted{color:var(--muted);}
-  button.btn{margin-left:auto;background:#22304b;color:#dce7ff;border:1px solid #304566;border-radius:10px;padding:8px 12px;font-size:12px;cursor:pointer}
-  button.btn:hover{filter:brightness(1.1)}
-  @media (max-width:900px){
-    .row{grid-template-columns:repeat(2,1fr)}
-    .twocol{grid-template-columns:1fr}
-  }
-  @media (max-width:560px){
-    .row{grid-template-columns:1fr}
-  }
-</style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Anxious Monkey — Lite v0.3</title>
+  <style>
+    :root{
+      --bg:#0c0f13;
+      --panel:#141922;
+      --muted:#8b93a1;
+      --text:#e7eef7;
+      --accent:#00d1b2; /* TEAL to prove version change */
+      --accent-weak:#00d1b21a;
+      --ok:#24d17e;
+      --warn:#ffd166;
+      --err:#ff5c5c;
+      --chip:#1d2330;
+      --chip-border:#2b3342;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      background: radial-gradient(1200px 800px at 120% -20%, #0d141c 20%, transparent 60%) no-repeat, var(--bg);
+      color:var(--text);
+    }
+    header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:14px 18px;border-bottom:1px solid #1d2330;background:linear-gradient(180deg,#0f131a, #0b0e13);
+      position:sticky;top:0;z-index:5;
+    }
+    .brand{display:flex;gap:10px;align-items:center;font-weight:700;}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+    .brand small{font-weight:600;color:var(--muted);margin-left:6px}
+    button.refresh{
+      background:var(--accent);color:#001411;border:none;border-radius:10px;
+      padding:8px 14px;font-weight:700;cursor:pointer;box-shadow:0 8px 16px var(--accent-weak);
+    }
+    main{padding:18px;display:grid;gap:14px;grid-template-columns: repeat(12, 1fr);}
+    .card{
+      background:var(--panel);border:1px solid #1b2230;border-radius:14px;
+      padding:14px 16px;min-height:84px;
+      box-shadow:0 10px 28px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.02);
+    }
+    .kpi{display:flex;flex-direction:column;gap:8px}
+    .kpi h4{margin:0 0 6px 0;font-size:13px;color:var(--muted);font-weight:600}
+    .kpi .value{font-size:22px;font-weight:800;letter-spacing:.2px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{
+      display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;
+      background:var(--chip);border:1px solid var(--chip-border);color:var(--text);font-weight:600;font-size:13px;
+    }
+    .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .pill{padding:4px 8px;border-radius:999px;border:1px solid #2b3342;background:#121824;color:var(--muted);font-size:12px}
+    .pill.ok{color:#aefbd0;border-color:#153022;background:#0b1d15}
+    .pill.warn{color:#ffe6a6;border-color:#3a2f09;background:#1b1505}
+    .pill.err{color:#ffb0b0;border-color:#3c0d0d;background:#1b0b0b}
+    .title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .title h3{margin:0;font-size:14px;color:var(--muted);font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+    .weights{display:grid;gap:10px}
+    .bar{height:8px;background:#0f1420;border-radius:6px;overflow:hidden;border:1px solid #1d2432}
+    .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#8af3e4)}
+    .row-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    /* layout */
+    .col-3{grid-column:span 3}
+    .col-4{grid-column:span 4}
+    .col-6{grid-column:span 6}
+    .col-8{grid-column:span 8}
+    .col-12{grid-column:span 12}
+    @media (max-width: 960px){
+      .col-6,.col-8{grid-column:span 12}
+      .row-grid{grid-template-columns:1fr}
+    }
+    footer{padding:10px 16px;color:var(--muted);font-size:12px}
+    code.url{color:#9bdcff;background:#08131a;border:1px solid #143243;padding:2px 6px;border-radius:6px}
+  </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <span class="dot" id="liveDot"></span>
-      <h1>Anxious Monkey — <span class="sub">Lite</span></h1>
-      <div class="sub" id="ts"></div>
-      <button class="btn" id="refresh">Refresh</button>
-    </header>
-
-    <!-- Health -->
-    <div class="health" id="health"></div>
-
-    <!-- Top KPIs -->
-    <div class="row" id="kpis">
-      <div class="card"><div class="title">NAAIM</div><div class="value" data-kpi="naaim">—</div></div>
-      <div class="card"><div class="title">&gt;50DMA (NDX)</div><div class="value" data-kpi="ndx50">—</div></div>
-      <div class="card"><div class="title">China (FXI)</div><div class="value" data-kpi="china">—</div></div>
-      <div class="card"><div class="title">FRED Macro</div><div class="value" data-kpi="fred">—</div></div>
+  <header>
+    <div class="brand"><span class="dot"></span> Anxious Monkey — <span style="color:var(--accent);font-weight:800">Lite v0.3</span><small id="ts"></small></div>
+    <div class="row">
+      <span id="health" class="pill">loading…</span>
+      <button class="refresh" id="btnRefresh">Refresh</button>
     </div>
+  </header>
 
-    <div class="twocol">
-      <!-- Weights -->
-      <div class="card" id="weights">
-        <div class="title">Factor Weights</div>
-        <div class="list" id="weightsList"></div>
-      </div>
+  <main>
+    <!-- KPIs -->
+    <section class="card kpi col-3"><h4>NAAIM</h4><div class="value" id="k_naaim">—</div></section>
+    <section class="card kpi col-3"><h4>&gt;50DMA (NDX)</h4><div class="value" id="k_ndx">—</div></section>
+    <section class="card kpi col-3"><h4>China (FXI)</h4><div class="value" id="k_china">—</div></section>
+    <section class="card kpi col-3"><h4>FRED Macro</h4><div class="value" id="k_fred">—</div></section>
 
-      <!-- Playbook -->
-      <div class="card" id="playbook">
-        <div class="title">Playbook</div>
-        <div id="playText" class="muted">Waiting for data…</div>
-      </div>
-    </div>
+    <!-- Weights -->
+    <section class="card col-6">
+      <div class="title"><h3>Factor Weights</h3><div class="legend" id="w_legend"></div></div>
+      <div class="weights" id="weights"></div>
+    </section>
+
+    <!-- Playbook -->
+    <section class="card col-6">
+      <div class="title"><h3>Playbook</h3><span id="play_src" class="pill">—</span></div>
+      <div id="play" style="white-space:pre-wrap;line-height:1.6"></div>
+    </section>
+
+    <!-- Factors Panels -->
+    <section class="card col-4">
+      <div class="title"><h3>NAAIM Exposure</h3><span id="src_naaim" class="pill">—</span></div>
+      <div id="p_naaim" class="row"></div>
+    </section>
+    <section class="card col-4">
+      <div class="title"><h3>&gt;50DMA Breadth (NDX)</h3><span id="src_ndx" class="pill">—</span></div>
+      <div id="p_ndx" class="row"></div>
+    </section>
+    <section class="card col-4">
+      <div class="title"><h3>FRED Macro (DGS10, DFF)</h3><span id="src_fred" class="pill">—</span></div>
+      <div id="p_fred" class="row"></div>
+    </section>
 
     <!-- Spot -->
-    <div class="card" style="margin-top:12px">
-      <div class="title">Spot</div>
-      <div class="spot" id="spot"></div>
-    </div>
+    <section class="card col-12">
+      <div class="title"><h3>Spot</h3><span id="src_prices" class="pill">—</span></div>
+      <div id="spot" class="row"></div>
+    </section>
+  </main>
 
-  </div>
+  <footer>
+    Data URLs — factors: <code class="url" id="u_factors">n/a</code> · model: <code class="url" id="u_model">n/a</code> · prices: <code class="url" id="u_prices">n/a</code>
+  </footer>
 
 <script>
-const PATHS = {
-  factors: 'factors_namm50.json',          // also tries '/anxiousmonkey-backtests/factors_namm50.json'
-  model:   'models/namm50.json',
-  prices:  'prices.json'
-};
-const WANT_SPOT = ['SPY','QQQ','TQQQ','SOXL','FEZ','CURE'];
+const VER = "v0.3";
+document.getElementById("ts").textContent = new Date().toLocaleString();
 
-function tryPaths(rel){
-  const here = rel;
-  const rootGuess = location.pathname.includes('/anxiousmonkey-backtests/')
-        ? '/anxiousmonkey-backtests/'+rel
-        : '/'+rel;
-  return [here, rootGuess];
+const NEED = {
+  factors: "factors_namm50.json",
+  model:   "models/namm50.json",
+  prices:  "prices.json",
+};
+
+// Build candidate paths for a file under GitHub Pages
+function candidateURLs(file){
+  const origin = window.location.origin;
+  const path = window.location.pathname;
+  // repo root guess (common on GitHub Pages)
+  const repo = (path.includes("/anxiousmonkey-backtests/"))
+    ? "/anxiousmonkey-backtests/"
+    : path.split("/").slice(0,2).join("/") + "/"; // fallback "/<repo>/" or "/"
+
+  const baseDir = path.endsWith("/") ? path : path.replace(/\/[^\/]*$/, "/");
+  const appDir = baseDir; // where index.html lives
+
+  const uniq = "t="+Date.now();
+  const list = [
+    origin + appDir + file,                      // ./file (same dir)
+    origin + repo + file,                        // /repo/file (GH Pages)
+    origin + "/" + file,                         // /file (site root)
+    file                                         // relative
+  ];
+  // add with cache buster
+  return [...new Set(list)].map(u => u + (u.includes("?") ? "&" : "?") + uniq);
 }
 
-async function fetchWithFallback(rel){
-  const tries = tryPaths(rel);
-  let lastErr;
-  for(const url of tries){
+async function fetchFirstJSON(file){
+  const urls = candidateURLs(file);
+  let lastErr = null;
+  for (const url of urls){
     try{
-      const r = await fetch(url,{cache:'no-store'});
-      if(r.ok){return await r.json();}
-      lastErr = new Error('HTTP '+r.status+' @ '+url);
+      const r = await fetch(url, {cache:"no-store"});
+      if (!r.ok) throw new Error("HTTP "+r.status);
+      const j = await r.json();
+      return {data:j, url};
     }catch(e){ lastErr = e; }
   }
-  throw lastErr || new Error('Fetch failed: '+rel);
+  throw new Error("All candidates failed for "+file+" ("+lastErr+")");
 }
 
 // helpers
-function latestFromSeries(series){
-  if(!series || !series.length) return null;
-  for(let i=series.length-1;i>=0;i--){
-    const item = series[i];
-    let v = null;
-    if(Array.isArray(item)){
-      // [ts, v, ...] or ["2025-01-01", v, ...]
-      v = item.length>1 ? item[1] : null;
-    }else if (typeof item === 'object' && item){
-      v = item.v ?? item.value ?? null;
-    }else if(typeof item === 'number'){ v = item; }
-    if(v !== null && !Number.isNaN(Number(v))) return Number(v);
+const el = sel => document.querySelector(sel);
+const fmt = (x, d=2) => (typeof x==="number" && isFinite(x)) ? x.toFixed(d) : "—";
+const pct = x => (typeof x==="number" && isFinite(x)) ? (x*100).toFixed(1)+"%" : "—";
+
+function lastNumber(series){
+  if (!series) return null;
+  if (Array.isArray(series)){
+    for (let i=series.length-1;i>=0;i--){
+      const row = series[i];
+      // handle [idx, ts?, val] or {value:}
+      if (Array.isArray(row)){
+        const v = row[row.length-1];
+        if (typeof v === "number" && isFinite(v)) return v;
+      }else if (row && typeof row==="object" && typeof row.value==="number"){
+        return row.value;
+      }
+    }
   }
   return null;
 }
 
-function setKPI(key, val){
-  const el = document.querySelector(`[data-kpi="${key}"]`);
-  if(!el) return;
-  el.textContent = (val===null || val===undefined) ? '—' : String(val.toFixed ? val.toFixed(2) : val);
+function setPill(id, state, txt){
+  const p = el(id); if (!p) return;
+  p.classList.remove("ok","warn","err");
+  if (state) p.classList.add(state);
+  p.textContent = txt || state || "—";
 }
 
-// progress rows
-function addWeightRow(name, weight){
-  const row = document.createElement('div');
-  row.className='rowbar';
-  const label = document.createElement('div'); label.className='label'; label.textContent = name;
-  const bar = document.createElement('div'); bar.className='bar';
-  const fill = document.createElement('i');
-  const pct = Math.max(0, Math.min(100, (Number(weight)||0)*100));
-  fill.style.width = pct.toFixed(0)+'%';
-  bar.appendChild(fill);
-  const pctTxt = document.createElement('div'); pctTxt.className='pct'; pctTxt.textContent = pct.toFixed(0)+'%';
-  row.append(label, bar, pctTxt);
-  document.getElementById('weightsList').appendChild(row);
-}
-
-function setHealthBadge(name, level, msg){
-  const pill = document.createElement('span');
-  pill.className='pill ' + (level||'ok');
-  pill.textContent = name + (msg?(' · '+msg):'');
-  document.getElementById('health').appendChild(pill);
-}
-
-function formatPlaybook(weightsOk, kpiOk){
-  if(!weightsOk && !kpiOk) return 'Playbook: 数据不足，维持中性、降低仓位，等待数据源恢复。';
-  if(weightsOk && !kpiOk) return 'Playbook: 仅依据模型权重进行中性权重配置；等待因子指标更新后再加仓。';
-  if(!weightsOk && kpiOk) return 'Playbook: 仅依据因子读数进行温和倾向调整；风险控制优先。';
-  return 'Playbook: Neutral · 观察为主；仅在强信号共振时加减仓，保持中性敞口。';
-}
-
-function nowISO(){
-  return new Date().toLocaleString();
-}
-
-async function main(){
-  document.getElementById('ts').textContent = 'Last updated ' + nowISO();
-  const health = document.getElementById('health'); health.innerHTML='';
-  document.getElementById('weightsList').innerHTML='';
-  document.getElementById('spot').innerHTML='';
-  document.getElementById('playText').textContent = 'Waiting for data…';
-
-  let model, factors, prices;
-  let weightsOk=false, kpiOk=false;
-
-  // model weights
+(async function init(){
+  // health thaw
+  setPill("#health","warn","loading…");
+  const results = { factors:null, model:null, prices:null };
   try{
-    model = await fetchWithFallback(PATHS.model);
-    const w = model && model.weights ? model.weights : null;
-    if(w){
-      const names = Object.keys(w);
-      if(names.length){
-        names.forEach(n => addWeightRow(n, w[n]));
-        weightsOk = true;
-        setHealthBadge('model', 'ok', '✓');
-      }else{
-        setHealthBadge('model', 'warn', 'empty');
-      }
-    }else{
-      setHealthBadge('model', 'warn', 'missing weights');
+    results.factors = await fetchFirstJSON(NEED.factors);
+    el("#u_factors").textContent = results.factors.url;
+    setPill("#src_naaim","ok","factors");
+    setPill("#src_ndx","ok","factors");
+    setPill("#src_fred","ok","factors");
+  }catch(e){
+    alert("加载失败: factors ["+e.message+"]");
+    setPill("#src_naaim","err","404");
+    setPill("#src_ndx","err","404");
+    setPill("#src_fred","err","404");
+  }
+
+  try{
+    results.model = await fetchFirstJSON(NEED.model);
+    el("#u_model").textContent = results.model.url;
+    setPill("#play_src","ok","model");
+  }catch(e){
+    setPill("#play_src","err","404");
+  }
+
+  try{
+    results.prices = await fetchFirstJSON(NEED.prices);
+    el("#u_prices").textContent = results.prices.url;
+    setPill("#src_prices","ok","prices");
+  }catch(e){
+    setPill("#src_prices","warn","missing");
+  }
+
+  // KPIs from factors if available
+  const f = results.factors?.data || {};
+  const fx = f.factors || {};
+  const naaim = lastNumber(fx.naaim_exposure?.series);
+  const ndx   = lastNumber(fx.ndx_breadth?.series);
+  const china = lastNumber(fx.china_proxy?.series);
+  const fred  = lastNumber(fx.fred_macro?.series);
+  el("#k_naaim").textContent = (naaim!=null ? fmt(naaim,2) : "—");
+  el("#k_ndx").textContent   = (ndx!=null ? pct(ndx) : "—");
+  el("#k_china").textContent = (china!=null ? fmt(china,2) : "—");
+  el("#k_fred").textContent  = (fred!=null ? fmt(fred,2) : "—");
+
+  // factor panels show small chips with latest
+  if (naaim!=null) el("#p_naaim").innerHTML = `<span class="chip">latest: ${fmt(naaim,2)}</span>`;
+  if (ndx!=null)   el("#p_ndx").innerHTML   = `<span class="chip">above 50dma: ${pct(ndx)}</span>`;
+  if (fred!=null)  el("#p_fred").innerHTML  = `<span class="chip">score: ${fmt(fred,2)}</span>`;
+
+  // Weights
+  const m = results.model?.data || {};
+  const weights = m.weights || {};
+  const wContainer = el("#weights");
+  const legend = el("#w_legend");
+  wContainer.innerHTML = "";
+  legend.innerHTML = "";
+  let sum=0; Object.values(weights).forEach(v=>{ if(typeof v==="number") sum+=v; });
+  for (const [k,v] of Object.entries(weights)){
+     if (typeof v!=="number") continue;
+     const pctw = sum>0 ? (v/sum*100) : 0;
+     const row = document.createElement("div");
+     row.innerHTML = `<div class="row" style="justify-content:space-between;">
+         <div class="chip" style="padding:4px 8px">${k}</div>
+         <div style="color:var(--muted);font-size:12px">${pctw.toFixed(1)}%</div>
+       </div>
+       <div class="bar"><i style="width:${pctw.toFixed(1)}%"></i></div>`;
+     wContainer.appendChild(row);
+     const lg = document.createElement("span");
+     lg.className="pill";
+     lg.textContent=`${k}: ${pctw.toFixed(1)}%`;
+     legend.appendChild(lg);
+  }
+
+  // Spot tickers
+  const want = ["SPY","QQQ","TQQQ","SOXL","FEZ","CURE"];
+  const px = results.prices?.data || {};
+  const spot = el("#spot");
+  if (px && typeof px==="object"){
+    for (const s of want){
+      const v = px[s];
+      if (v==null) continue;
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.innerHTML = `<strong>${s}</strong> ${fmt(v,2)}`;
+      spot.appendChild(chip);
     }
-  }catch(e){
-    setHealthBadge('model', 'err', 'fetch fail');
-    console.warn('model fetch error', e);
   }
+  if (!spot.children.length) spot.textContent = "No prices yet.";
 
-  // factors
-  try{
-    factors = await fetchWithFallback(PATHS.factors);
-    const fx = factors && factors.factors ? factors.factors : factors;
-    const NAAIM = latestFromSeries(fx?.naaim_exposure?.series);
-    const NDX50 = latestFromSeries(fx?.ndx_breadth?.series);
-    const CHINA = latestFromSeries(fx?.china_proxy?.series);
-    const FRED = latestFromSeries(fx?.fred_macro?.series);
-    setKPI('naaim', NAAIM);
-    setKPI('ndx50', NDX50);
-    setKPI('china', CHINA);
-    setKPI('fred', FRED);
-    if([NAAIM,NDX50,CHINA,FRED].some(v=>typeof v==='number')){
-      kpiOk = true; setHealthBadge('factors','ok','✓');
-    }else{
-      setHealthBadge('factors','warn','no recent values');
-    }
-  }catch(e){
-    setHealthBadge('factors','err','fetch fail');
-    console.warn('factors fetch error', e);
+  // Playbook (simplified, data-aware)
+  let pb = "";
+  const hasModel = !!results.model;
+  const hasFactors = !!results.factors;
+  if (hasModel && hasFactors){
+     pb = "Neutral · 观察为主；仅在强信号共振时加减仓，保持中性敞口。";
+  }else if (hasModel){
+     pb = "Model ready but factors missing · 仅根据模型低频信号做轻仓位调整。";
+  }else if (hasFactors){
+     pb = "Factors ready but model missing · 使用原始因子阈值进行保守判断。";
+  }else{
+     pb = "数据未就绪 · 暂不操作。";
   }
+  el("#play").textContent = "Playbook: "+pb;
 
-  // prices / spot
-  try{
-    prices = await fetchWithFallback(PATHS.prices);
-    const spotBox = document.getElementById('spot');
-    let shown=0;
-    WANT_SPOT.forEach(sym=>{
-      const val = prices && (prices[sym] ?? prices[sym?.toUpperCase()]);
-      if(val !== undefined){
-        const chip = document.createElement('span');
-        chip.className='chip'; chip.textContent = `${sym}: ${val}`;
-        spotBox.appendChild(chip); shown++;
-      }
-    });
-    setHealthBadge('spot', shown? 'ok':'warn', shown? `✓ ${shown}`:'none');
-  }catch(e){
-    setHealthBadge('spot','warn','missing');
-  }
+  // Health
+  const ok = (results.factors && results.model);
+  setPill("#health", ok? "ok": "warn", ok? "live" : "degraded");
 
-  // playbook
-  document.getElementById('playText').textContent = formatPlaybook(weightsOk, kpiOk);
-}
-
-document.getElementById('refresh').addEventListener('click', main);
-main();
+  // refresh
+  document.getElementById("btnRefresh").onclick = ()=> location.reload();
+})().catch(err=>{
+  alert("致命错误: "+err.message);
+});
 </script>
 </body>
 </html>
