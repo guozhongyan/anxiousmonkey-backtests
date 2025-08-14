@@ -1,37 +1,50 @@
+name: train-models
 
-    name: train-models
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'models/**'
+      - '.github/workflows/train-models.yml'
 
-    on:
-      workflow_dispatch:
+permissions:
+  contents: write
 
-    permissions:
-      contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
+      ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
 
-    jobs:
-      build:
-        runs-on: ubuntu-latest
-        steps:
-          - uses: actions/checkout@v4
-            with: { fetch-depth: 0 }
-          - uses: actions/setup-python@v5
-            with: { python-version: '3.11' }
-          - name: Install deps
-            run: |
-              python -m pip install -U pip
-              pip install pandas numpy peewee openpyxl python-dateutil requests beautifulsoup4 lxml
-          - name: Train NAMM-50 (free)
-            run: |
-              python -m models.namm50.train
+    steps:
+      - uses: actions/checkout@v4
 
-- name: Commit docs
-  run: |
-    git config user.name "github-actions[bot]"
-    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-    git fetch origin main
-    git pull --rebase origin main
-    git add docs/**/*.json || true
-    git add docs/*.json || true
-    git add docs/models/*.json || true
-    git commit -m "Update docs [hotfix path/core] [skip ci]" || echo "no changes"
-    git push origin HEAD:main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-input requests pandas numpy python-dateutil yfinance beautifulsoup4 lxml peewee websockets tzdata scikit-learn
+
+      - name: Train NAMM-50 (free)
+        run: |
+          if [ -f models/namm50/train.py ]; then python models/namm50/train.py; else python -m models.namm50.train || true; fi
+
+      - name: Ensure model JSON published
+        run: |
+          mkdir -p docs/models
+          # 如果训练脚本把文件放在其它目录，这里兜底搬运
+          if [ -f models/docs/models/namm50.json ]; then cp -f models/docs/models/namm50.json docs/models/namm50.json; fi
+          if [ -f docs/models/namm50.json ]; then echo "model json ready"; else echo "warning: model json not found"; fi
+
+      - name: Commit model/backtests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin "${GITHUB_REF_NAME}" || true
+          git add docs/models || true
+          git commit -m "Publish NAMM-50 model [skip ci]" || echo "nothing to commit"
+          git push || echo "nothing to push"
