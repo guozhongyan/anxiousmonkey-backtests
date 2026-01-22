@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-01-21T08:38:45Z",
+  "as_of": "2026-01-22T08:39:07Z",
   "model": "NAMM-50",
   "version": "v0.1-hotfix-av-fallback",
   "weights": {
@@ -9,6 +9,6 @@
     "CHINA": 0.0
   },
   "latest": {
-    "rows": 8101
+    "rows": 8102
   }
 }
